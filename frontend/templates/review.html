@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Terms - Glossary Generator</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Review Generated Terms</h1>
+            <p class="subtitle">Review and approve glossary terms before publishing to Atlan</p>
+        </header>
+
+        <nav class="nav-tabs">
+            <a href="/" class="nav-tab">Generate</a>
+            <a href="/review" class="nav-tab active">Review Terms</a>
+            <a href="/settings" class="nav-tab">Settings</a>
+        </nav>
+
+        <main>
+            <!-- Stats Dashboard -->
+            <section class="stats-dashboard">
+                <div class="stat-card">
+                    <span class="stat-value" id="statTotal">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-card pending">
+                    <span class="stat-value" id="statPending">0</span>
+                    <span class="stat-label">Pending Review</span>
+                </div>
+                <div class="stat-card approved">
+                    <span class="stat-value" id="statApproved">0</span>
+                    <span class="stat-label">Approved</span>
+                </div>
+                <div class="stat-card rejected">
+                    <span class="stat-value" id="statRejected">0</span>
+                    <span class="stat-label">Rejected</span>
+                </div>
+                <div class="stat-card published">
+                    <span class="stat-value" id="statPublished">0</span>
+                    <span class="stat-label">Published</span>
+                </div>
+            </section>
+
+            <!-- Filters and Actions -->
+            <section class="card filters-section">
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>Status:</label>
+                        <select id="statusFilter">
+                            <option value="">All</option>
+                            <option value="pending_review" selected>Pending Review</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="published">Published</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Confidence:</label>
+                        <select id="confidenceFilter">
+                            <option value="">All</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" id="refreshBtn">Refresh</button>
+                </div>
+                <div class="bulk-actions">
+                    <button class="btn btn-success" id="bulkApproveBtn" disabled>
+                        Approve Selected
+                    </button>
+                    <button class="btn btn-primary" id="publishBtn" disabled>
+                        Publish Approved
+                    </button>
+                </div>
+            </section>
+
+            <!-- Terms List -->
+            <section class="terms-list" id="termsList">
+                <p class="loading">Loading terms...</p>
+            </section>
+        </main>
+
+        <!-- Term Detail Modal -->
+        <div class="modal" id="termModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalTermName">Term Name</h2>
+                    <button class="close-btn" id="closeModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="term-meta">
+                        <span class="badge" id="modalConfidence">-</span>
+                        <span class="badge" id="modalStatus">-</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Definition</label>
+                        <textarea id="modalDefinition" rows="4"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Short Description</label>
+                        <input type="text" id="modalShortDesc" readonly>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Examples</label>
+                        <ul id="modalExamples" class="examples-list"></ul>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Synonyms</label>
+                        <div id="modalSynonyms" class="tags"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Source Assets</label>
+                        <ul id="modalSources" class="sources-list"></ul>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Reviewer Notes</label>
+                        <textarea id="modalNotes" rows="2" placeholder="Add notes..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-danger" id="modalRejectBtn">Reject</button>
+                    <button class="btn btn-success" id="modalApproveBtn">Approve</button>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Powered by Atlan Application SDK</p>
+        </footer>
+    </div>
+
+    <script src="/static/review.js"></script>
+</body>
+</html>

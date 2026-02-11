@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glossary Generator</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Business Glossary Generator</h1>
+            <p class="subtitle">Auto-generate glossary terms from your data catalog metadata</p>
+        </header>
+
+        <nav class="nav-tabs">
+            <a href="/" class="nav-tab active">Generate</a>
+            <a href="/review" class="nav-tab">Review Terms</a>
+            <a href="/settings" class="nav-tab">Settings</a>
+        </nav>
+
+        <main>
+            <section class="card">
+                <h2>Start Generation Workflow</h2>
+                <form id="workflowForm">
+                    <div class="form-group">
+                        <label for="glossaryQn">Target Glossary Qualified Name</label>
+                        <input type="text" id="glossaryQn" name="target_glossary_qn"
+                               placeholder="default/glossary/business-glossary" required>
+                        <small>The qualified name of the glossary where terms will be created</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="assetTypes">Asset Types</label>
+                        <select id="assetTypes" name="asset_types" multiple>
+                            <option value="Table" selected>Tables</option>
+                            <option value="View" selected>Views</option>
+                            <option value="MaterializedView">Materialized Views</option>
+                        </select>
+                        <small>Types of assets to scan for glossary terms</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="maxAssets">Max Assets</label>
+                            <input type="number" id="maxAssets" name="max_assets" value="100" min="1" max="1000">
+                            <small>Maximum assets to process</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="minPopularity">Min Popularity Score</label>
+                            <input type="number" id="minPopularity" name="min_popularity_score" value="0" min="0" step="0.1">
+                            <small>Filter by minimum popularity</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="batchSize">Batch Size</label>
+                            <input type="number" id="batchSize" name="batch_size" value="10" min="1" max="50">
+                            <small>Assets per LLM batch</small>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="startBtn">
+                        Start Generation
+                    </button>
+                </form>
+            </section>
+
+            <section class="card" id="statusSection" style="display: none;">
+                <h2>Workflow Status</h2>
+                <div class="status-container">
+                    <div class="status-info">
+                        <span class="status-label">Workflow ID:</span>
+                        <span id="workflowId" class="status-value">-</span>
+                    </div>
+                    <div class="status-info">
+                        <span class="status-label">Status:</span>
+                        <span id="workflowStatus" class="status-value badge">-</span>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+                        </div>
+                        <span id="progressText">0%</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Powered by Atlan Application SDK</p>
+        </footer>
+    </div>
+
+    <script>
+        const form = document.getElementById('workflowForm');
+        const statusSection = document.getElementById('statusSection');
+        const startBtn = document.getElementById('startBtn');
+        let pollInterval = null;
+
+        // Load settings on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/api/v1/settings');
+                const settings = await response.json();
+
+                // Auto-populate default glossary if configured
+                if (settings.default_glossary_qn) {
+                    document.getElementById('glossaryQn').value = settings.default_glossary_qn;
+                }
+
+                // Show warning if not configured
+                if (!settings.is_configured) {
+                    const warning = document.createElement('div');
+                    warning.className = 'card warning-card';
+                    warning.innerHTML = `
+                        <p><strong>Settings not configured.</strong>
+                        Please <a href="/settings">configure your API credentials</a> before running the workflow.</p>
+                    `;
+                    document.querySelector('main').insertBefore(warning, document.querySelector('main').firstChild);
+                }
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            startBtn.disabled = true;
+            startBtn.textContent = 'Starting...';
+
+            const formData = new FormData(form);
+            const config = {
+                target_glossary_qn: formData.get('target_glossary_qn'),
+                asset_types: Array.from(document.getElementById('assetTypes').selectedOptions).map(o => o.value),
+                max_assets: parseInt(formData.get('max_assets')),
+                min_popularity_score: parseFloat(formData.get('min_popularity_score')),
+                batch_size: parseInt(formData.get('batch_size')),
+            };
+
+            try {
+                const response = await fetch('/workflows/v1/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config),
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Start Generation';
+                    return;
+                }
+
+                document.getElementById('workflowId').textContent = result.workflow_id;
+                statusSection.style.display = 'block';
+                startPolling(result.workflow_id);
+
+            } catch (error) {
+                alert('Error starting workflow: ' + error.message);
+                startBtn.disabled = false;
+                startBtn.textContent = 'Start Generation';
+            }
+        });
+
+        function startPolling(workflowId) {
+            updateStatus(workflowId);
+            pollInterval = setInterval(() => updateStatus(workflowId), 2000);
+        }
+
+        async function updateStatus(workflowId) {
+            try {
+                const response = await fetch(`/workflows/v1/status/${workflowId}`);
+                const data = await response.json();
+
+                const statusEl = document.getElementById('workflowStatus');
+                const progressBar = document.getElementById('progressBar');
+                const progressText = document.getElementById('progressText');
+
+                statusEl.textContent = data.status || 'unknown';
+                statusEl.className = 'status-value badge badge-' + (data.status || 'unknown');
+
+                const progress = data.progress || 0;
+                progressBar.style.width = progress + '%';
+                progressText.textContent = progress + '%';
+
+                if (data.status === 'completed' || data.status === 'failed') {
+                    clearInterval(pollInterval);
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Start New Generation';
+
+                    if (data.status === 'completed') {
+                        setTimeout(() => {
+                            if (confirm('Generation complete! Would you like to review the generated terms?')) {
+                                window.location.href = '/review';
+                            }
+                        }, 500);
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error polling status:', error);
+            }
+        }
+    </script>
+</body>
+</html>
