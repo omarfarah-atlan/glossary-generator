@@ -160,6 +160,24 @@ class GlossaryGenerationWorkflow:
             self._log(f"Keeping top {config.max_terms} of {len(terms_dict)} generated terms.", "generating_definitions")
             terms_dict = terms_dict[:config.max_terms]
 
+        # Step 5b: Suggest relationships between terms (70%)
+        if len(terms_dict) >= 2:
+            self._progress = 70
+            self._log(f"Discovering relationships between {len(terms_dict)} terms...", "generating_definitions")
+
+            terms_dict = await workflow.execute_activity(
+                GlossaryActivities.suggest_relationships,
+                terms_dict,
+                start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+
+            rel_count = sum(len(t.get("related_terms", [])) for t in terms_dict) // 2
+            if rel_count > 0:
+                self._log(f"Found {rel_count} relationships between terms.", "generating_definitions")
+            else:
+                self._log("No strong relationships found between terms.", "generating_definitions")
+
         # Step 6: Save draft terms (85%)
         self._status = "saving_drafts"
         self._progress = 85

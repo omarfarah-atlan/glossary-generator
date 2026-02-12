@@ -52,6 +52,7 @@ class GlossaryTermDraft(BaseModel):
     source_schema: Optional[str] = None
     generation_reasoning: Optional[str] = None
     metadata_signals: List[str] = Field(default_factory=list)
+    related_terms: List[dict] = Field(default_factory=list)  # [{term_name, relationship}]
     edited_definition: Optional[str] = None
     reviewer_notes: Optional[str] = None
     created_at: Optional[datetime] = None

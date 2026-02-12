@@ -425,6 +425,58 @@ async def publish_terms(request: PublishRequest):
     return results
 
 
+class RefineRequest(BaseModel):
+    feedback: str
+
+
+@router.post("/api/v1/terms/{term_id}/refine")
+async def refine_term(term_id: str, request: RefineRequest):
+    """Refine a term definition using AI based on reviewer feedback."""
+    if _get_dapr_client() is None:
+        raise HTTPException(status_code=503, detail="State store unavailable")
+
+    try:
+        from dapr.clients import DaprClient
+        from clients.llm_client import ClaudeClient
+
+        # Load term
+        with DaprClient() as client:
+            state = client.get_state(store_name=DAPR_STORE_NAME, key=f"glossary_term_{term_id}")
+            if not state.data:
+                raise HTTPException(status_code=404, detail="Term not found")
+            term_data = json.loads(state.data)
+
+        # Call LLM to refine
+        llm = ClaudeClient()
+        current_def = term_data.get("edited_definition") or term_data.get("definition", "")
+        result = await llm.refine_definition(
+            term_name=term_data.get("name", ""),
+            term_type=term_data.get("term_type", "business_term"),
+            original_definition=current_def,
+            feedback=request.feedback,
+        )
+
+        refined = result.get("definition", current_def)
+
+        # Save the refined definition
+        with DaprClient() as client:
+            term_data["edited_definition"] = refined
+            client.save_state(
+                store_name=DAPR_STORE_NAME,
+                key=f"glossary_term_{term_id}",
+                value=json.dumps(term_data),
+            )
+
+        _mark_dapr_available(True)
+        return {"definition": refined}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error refining term {term_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/api/v1/terms")
 async def clear_all_terms():
     """Delete all draft terms and batch indexes from the state store."""

@@ -357,6 +357,8 @@ Respond ONLY with the JSON object, no additional text."""
 
     @staticmethod
     def refinement_prompt(
+        term_name: str,
+        term_type: str,
         original_definition: str,
         feedback: str
     ) -> str:
@@ -364,17 +366,63 @@ Respond ONLY with the JSON object, no additional text."""
 
         return f"""You are a data steward refining a glossary term definition.
 
-## Original Definition
+## Term
+- **Name**: {term_name}
+- **Type**: {term_type}
+
+## Current Definition
 {original_definition}
 
-## Feedback
+## Reviewer Feedback
 {feedback}
 
 ## Instructions
-Improve the definition based on the feedback. Maintain the same JSON format:
+Rewrite the definition based on the reviewer's feedback. Keep the same business concept focus.
+- Do NOT say "this table", "this view", or reference technical storage
+- Keep it 2-4 sentences
+- Maintain business-friendly language
+
+Respond with a JSON object:
 {{
-    "definition": "Improved definition",
-    "short_description": "Updated one-sentence summary"
+    "definition": "Improved definition incorporating the feedback"
 }}
 
 Respond ONLY with the JSON object."""
+
+    @staticmethod
+    def relationship_suggestion_prompt(
+        terms: List[dict],
+    ) -> str:
+        """Generate a prompt to suggest relationships between generated terms."""
+
+        term_list = "\n".join(
+            f"- **{t['name']}** ({t.get('term_type', 'business_term')}): {t.get('short_description', t.get('definition', '')[:100])}"
+            for t in terms
+        )
+
+        return f"""You are a data steward identifying relationships between business glossary terms.
+
+## Generated Terms
+{term_list}
+
+## Instructions
+Identify meaningful relationships between these terms. Only suggest relationships where there is a clear business connection — do not force relationships where none exist.
+
+Relationship types:
+- **related_to**: Terms that are conceptually related (e.g., "Customer" and "Order")
+- **is_part_of**: Term is a component of another (e.g., "Monthly Revenue" is part of "Revenue")
+- **depends_on**: Term's meaning depends on another (e.g., "Conversion Rate" depends on "Customer")
+
+Respond with a JSON array. Each entry is a pair:
+[
+    {{
+        "from_term": "Term A name",
+        "to_term": "Term B name",
+        "relationship": "related_to|is_part_of|depends_on",
+        "reason": "Brief explanation"
+    }}
+]
+
+Only include high-confidence relationships. If no clear relationships exist, return an empty array [].
+
+Respond ONLY with the JSON array."""

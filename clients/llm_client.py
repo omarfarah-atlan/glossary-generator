@@ -176,3 +176,29 @@ class ClaudeClient:
         )
 
         return await self.generate_json(prompt)
+
+    async def refine_definition(
+        self,
+        term_name: str,
+        term_type: str,
+        original_definition: str,
+        feedback: str,
+    ) -> dict:
+        """Refine a term definition based on reviewer feedback."""
+        from generators.prompts import PromptTemplates
+
+        prompt = PromptTemplates.refinement_prompt(
+            term_name=term_name,
+            term_type=term_type,
+            original_definition=original_definition,
+            feedback=feedback,
+        )
+
+        return await self.generate_json(prompt)
+
+    async def suggest_relationships(self, terms: list) -> list:
+        """Suggest relationships between a set of generated terms."""
+        from generators.prompts import PromptTemplates
+
+        prompt = PromptTemplates.relationship_suggestion_prompt(terms)
+        return await self.generate_json_array(prompt)

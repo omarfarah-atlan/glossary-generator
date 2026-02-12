@@ -456,6 +456,59 @@ class GlossaryActivities:
             return []
 
     @activity.defn
+    async def suggest_relationships(self, terms_dict: List[dict]) -> List[dict]:
+        """Use LLM to suggest relationships between generated terms."""
+        try:
+            if len(terms_dict) < 2:
+                return terms_dict
+
+            # Build lightweight term summaries for the prompt
+            summaries = [
+                {"name": t.get("name"), "term_type": t.get("term_type", "business_term"),
+                 "short_description": t.get("short_description", "")}
+                for t in terms_dict
+            ]
+
+            activity.heartbeat(f"Analyzing relationships between {len(summaries)} terms...")
+            suggestions = await self.llm_client.suggest_relationships(summaries)
+
+            if not suggestions:
+                return terms_dict
+
+            # Build a name→index lookup
+            name_lower_to_idx = {}
+            for i, t in enumerate(terms_dict):
+                name_lower_to_idx[t["name"].lower()] = i
+
+            # Apply suggestions to terms
+            count = 0
+            for s in suggestions:
+                from_name = s.get("from_term", "").lower()
+                to_name = s.get("to_term", "").lower()
+                rel_type = s.get("relationship", "related_to")
+                reason = s.get("reason", "")
+
+                from_idx = name_lower_to_idx.get(from_name)
+                to_idx = name_lower_to_idx.get(to_name)
+
+                if from_idx is not None and to_idx is not None:
+                    # Add bidirectional relationship
+                    terms_dict[from_idx].setdefault("related_terms", []).append(
+                        {"term_name": terms_dict[to_idx]["name"], "relationship": rel_type, "reason": reason}
+                    )
+                    terms_dict[to_idx].setdefault("related_terms", []).append(
+                        {"term_name": terms_dict[from_idx]["name"], "relationship": rel_type, "reason": reason}
+                    )
+                    count += 1
+
+            logger.info(f"Added {count} relationship pairs across terms")
+            return terms_dict
+
+        except Exception as e:
+            logger.error(f"Error suggesting relationships: {e}")
+            return terms_dict
+
+    @activity.defn
     async def notify_stewards(self, batch_id: str, term_count: int) -> bool:
         """Notify stewards that terms are ready for review."""
         logger.info(f"Batch {batch_id} ready for review with {term_count} terms")
@@ -500,6 +553,9 @@ class GlossaryActivities:
     async def publish_terms(self, term_ids: List[str]) -> dict:
         """Publish approved terms to Atlan glossary."""
         results = {"published": 0, "failed": 0, "errors": []}
+        # Track published term name → qualified_name for relationship linking
+        published_name_to_qn: Dict[str, str] = {}
+        published_terms_with_rels: List[GlossaryTermDraft] = []
 
         try:
             with DaprClient() as client:
@@ -537,6 +593,9 @@ class GlossaryActivities:
                                 value=json.dumps(term.model_dump(mode="json")),
                             )
                             results["published"] += 1
+                            published_name_to_qn[term.name.lower()] = qn
+                            if term.related_terms:
+                                published_terms_with_rels.append(term)
                         else:
                             results["failed"] += 1
                             results["errors"].append(f"Failed to create term: {term_id}")
@@ -549,5 +608,21 @@ class GlossaryActivities:
         except Exception as e:
             logger.error(f"Error connecting to Dapr: {e}")
             results["errors"].append(f"Dapr connection error: {e}")
+
+        # Link related terms via see_also (best effort, after all terms are created)
+        for term in published_terms_with_rels:
+            term_qn = published_name_to_qn.get(term.name.lower())
+            if not term_qn:
+                continue
+            related_qns = []
+            for rt in term.related_terms:
+                rqn = published_name_to_qn.get(rt.get("term_name", "").lower())
+                if rqn:
+                    related_qns.append(rqn)
+            if related_qns:
+                try:
+                    await self.atlan_client.link_related_terms(term_qn, related_qns)
+                except Exception as e:
+                    logger.warning(f"Could not link related terms for {term.name}: {e}")
 
         return results

@@ -232,6 +232,30 @@ function openTermModal(termId) {
         contextEl.style.display = 'none';
     }
 
+    // Related terms
+    const relatedGroup = document.getElementById('relatedTermsGroup');
+    const relatedTerms = currentTerm.related_terms || [];
+    if (relatedTerms.length > 0) {
+        relatedGroup.style.display = 'block';
+        const relatedDiv = document.getElementById('modalRelatedTerms');
+        const relLabels = {related_to: 'Related', is_part_of: 'Part of', depends_on: 'Depends on'};
+        relatedDiv.innerHTML = relatedTerms.map(rt => {
+            const relLabel = relLabels[rt.relationship] || rt.relationship;
+            return `<div class="related-term-item">
+                <span class="related-term-rel">${escapeHtml(relLabel)}</span>
+                <span class="related-term-name">${escapeHtml(rt.term_name)}</span>
+                ${rt.reason ? `<span class="related-term-reason">${escapeHtml(rt.reason)}</span>` : ''}
+            </div>`;
+        }).join('');
+    } else {
+        relatedGroup.style.display = 'none';
+    }
+
+    // Reset refine section
+    document.getElementById('refineRow').style.display = 'none';
+    document.getElementById('refineToggle').style.display = 'inline-flex';
+    document.getElementById('refineFeedback').value = '';
+
     // Update button states based on status
     const approveBtn = document.getElementById('modalApproveBtn');
     const rejectBtn = document.getElementById('modalRejectBtn');
@@ -380,6 +404,54 @@ async function clearAllTerms() {
     } catch (error) {
         console.error('Error clearing terms:', error);
         alert('Error clearing terms');
+    }
+}
+
+function toggleRefine() {
+    const row = document.getElementById('refineRow');
+    const toggle = document.getElementById('refineToggle');
+    row.style.display = 'flex';
+    toggle.style.display = 'none';
+    document.getElementById('refineFeedback').focus();
+}
+
+async function refineWithAI() {
+    if (!currentTerm) return;
+    const feedback = document.getElementById('refineFeedback').value.trim();
+    if (!feedback) return;
+
+    const btn = document.getElementById('refineSubmitBtn');
+    const origText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="spinner" width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="30"/></svg> Refining...';
+
+    try {
+        const response = await fetch(`/api/v1/terms/${currentTerm.id}/refine`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ feedback }),
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            alert('Refine failed: ' + (err.detail || 'Unknown error'));
+            return;
+        }
+
+        const result = await response.json();
+        document.getElementById('modalDefinition').value = result.definition;
+        document.getElementById('refineFeedback').value = '';
+        document.getElementById('refineRow').style.display = 'none';
+        document.getElementById('refineToggle').style.display = 'inline-flex';
+
+        // Update in-memory term
+        currentTerm.edited_definition = result.definition;
+    } catch (error) {
+        console.error('Error refining:', error);
+        alert('Error refining term');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = origText;
     }
 }
 

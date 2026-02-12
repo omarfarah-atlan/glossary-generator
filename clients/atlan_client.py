@@ -11,6 +11,7 @@ from pyatlan.model.assets import (
     Asset,
     Column,
     Connection,
+    MaterialisedView,
     Table,
     View,
     DbtModel,
@@ -315,14 +316,58 @@ class AtlanMetadataClient:
 
             if response and response.assets_created(AtlasGlossaryTerm):
                 created_term = response.assets_created(AtlasGlossaryTerm)[0]
-                logger.info(f"Created glossary term: {created_term.qualified_name}")
-                return created_term.qualified_name
+                term_qn = created_term.qualified_name
+                logger.info(f"Created glossary term: {term_qn}")
+
+                # Link term to source assets
+                await self._link_term_to_assets(term_qn, term_draft.source_assets)
+
+                return term_qn
 
             return None
 
         except Exception as e:
             logger.error(f"Error creating glossary term {term_draft.name}: {e}")
             return None
+
+    # Map of asset type names to pyatlan classes for ref_by_qualified_name
+    _ASSET_TYPE_MAP = {
+        "Table": Table,
+        "View": View,
+        "MaterialisedView": MaterialisedView,
+    }
+
+    async def _link_term_to_assets(self, term_qn: str, source_asset_qns: List[str]):
+        """Link a published glossary term to its source assets via assigned_terms."""
+        if not source_asset_qns:
+            return
+
+        term_ref = AtlasGlossaryTerm.ref_by_qualified_name(term_qn)
+
+        for asset_qn in source_asset_qns:
+            try:
+                # Determine asset type from qualified name or try Table first
+                asset_ref = Table.ref_by_qualified_name(asset_qn)
+                asset_ref.assigned_terms = [term_ref]
+                self.client.asset.save(asset_ref)
+                logger.info(f"Linked term {term_qn} to asset {asset_qn}")
+            except Exception as e:
+                logger.warning(f"Could not link term to asset {asset_qn}: {e}")
+
+    async def link_related_terms(self, term_qn: str, related_term_qns: List[str]):
+        """Link a glossary term to related terms via see_also."""
+        if not related_term_qns:
+            return
+        try:
+            term = AtlasGlossaryTerm.ref_by_qualified_name(term_qn)
+            term.see_also = [
+                AtlasGlossaryTerm.ref_by_qualified_name(rqn)
+                for rqn in related_term_qns
+            ]
+            self.client.asset.save(term)
+            logger.info(f"Linked {len(related_term_qns)} related terms to {term_qn}")
+        except Exception as e:
+            logger.warning(f"Could not link related terms for {term_qn}: {e}")
 
     async def create_glossary(self, name: str, description: Optional[str] = None) -> dict:
         """Create a new glossary in Atlan."""
