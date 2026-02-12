@@ -213,7 +213,7 @@
                                     <span class="checkbox-desc">Categorical attributes (status, region, segment)</span>
                                 </label>
                             </div>
-                            <small>Metrics and Dimensions are discovered from columns automatically.</small>
+                            <small>The AI classifies each term into the selected types based on the asset context.</small>
                         </div>
 
                         <div class="form-group" style="margin-top: 16px;">
@@ -275,7 +275,7 @@
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                                 <path d="M7 1a6 6 0 100 12A6 6 0 007 1zm0 3v4h1V4H7zm0 6h1v1H7v-1z"/>
                             </svg>
-                            Generation typically takes 2-5 minutes for 10 assets
+                            Generation typically takes under 1 minute
                         </div>
                     </div>
                 </form>
@@ -331,18 +331,13 @@
                                 <div class="timeline-circle">5</div>
                                 <div class="timeline-label">Generate Terms</div>
                             </div>
-                            <div class="timeline-step" data-step="classifying_columns">
-                                <div class="timeline-connector"></div>
-                                <div class="timeline-circle">6</div>
-                                <div class="timeline-label">Column Terms</div>
-                            </div>
                             <div class="timeline-step" data-step="saving_drafts">
                                 <div class="timeline-connector"></div>
-                                <div class="timeline-circle">7</div>
+                                <div class="timeline-circle">6</div>
                                 <div class="timeline-label">Save Drafts</div>
                             </div>
                             <div class="timeline-step" data-step="notifying">
-                                <div class="timeline-circle">8</div>
+                                <div class="timeline-circle">7</div>
                                 <div class="timeline-label">Notify</div>
                             </div>
                         </div>
@@ -755,7 +750,7 @@
         }
 
         // Timeline step order for comparison
-        const STEP_ORDER = ['validating', 'fetching_metadata', 'fetching_usage', 'prioritizing', 'generating_definitions', 'classifying_columns', 'saving_drafts', 'notifying', 'completed'];
+        const STEP_ORDER = ['validating', 'fetching_metadata', 'fetching_usage', 'prioritizing', 'generating_definitions', 'saving_drafts', 'notifying', 'completed'];
         let lastLogCount = 0;
 
         let _lastTimelineStatus = null;

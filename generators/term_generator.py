@@ -35,6 +35,7 @@ class TermGenerator:
         usage: Optional[UsageSignals] = None,
         target_glossary_qn: str = "",
         custom_context: Optional[str] = None,
+        term_types: Optional[list] = None,
     ) -> Optional[GlossaryTermDraft]:
         """Generate a single glossary term from an asset."""
 
@@ -53,7 +54,15 @@ class TermGenerator:
                     sql_definition=context.get("sql_definition"),
                     dbt_context=context.get("dbt_context"),
                     custom_context=custom_context,
+                    term_types=term_types,
                 )
+
+                # Parse term_type from LLM response, fallback to business_term
+                raw_type = result.get("term_type", "business_term")
+                try:
+                    resolved_type = TermType(raw_type)
+                except ValueError:
+                    resolved_type = TermType.BUSINESS_TERM
 
                 # Create draft from result
                 draft = GlossaryTermDraft(
@@ -66,13 +75,13 @@ class TermGenerator:
                     source_assets=[asset.qualified_name],
                     confidence=result.get("confidence", "medium"),
                     status=TermStatus.PENDING_REVIEW,
-                    term_type=TermType.BUSINESS_TERM,
+                    term_type=resolved_type,
                     target_glossary_qn=target_glossary_qn,
                     query_frequency=usage.query_frequency if usage else asset.query_count,
                     user_access_count=usage.unique_users if usage else asset.user_count,
                 )
 
-                logger.info(f"Generated term: {draft.name} (confidence: {draft.confidence})")
+                logger.info(f"Generated term: {draft.name} (type: {resolved_type.value}, confidence: {draft.confidence})")
                 return draft
 
             except Exception as e:
@@ -85,13 +94,14 @@ class TermGenerator:
         usage_signals: Dict[str, UsageSignals],
         target_glossary_qn: str,
         custom_context: Optional[str] = None,
+        term_types: Optional[list] = None,
     ) -> List[GlossaryTermDraft]:
         """Generate terms for a batch of assets concurrently."""
 
         tasks = []
         for asset in assets:
             usage = usage_signals.get(asset.qualified_name)
-            task = self.generate_term(asset, usage, target_glossary_qn, custom_context=custom_context)
+            task = self.generate_term(asset, usage, target_glossary_qn, custom_context=custom_context, term_types=term_types)
             tasks.append(task)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -112,6 +122,7 @@ class TermGenerator:
         target_glossary_qn: str,
         existing_term_names: Optional[set] = None,
         custom_context: Optional[str] = None,
+        term_types: Optional[list] = None,
     ) -> List[GlossaryTermDraft]:
         """Generate terms for all assets in batches with deduplication."""
 
@@ -140,7 +151,7 @@ class TermGenerator:
             logger.info(f"Processing batch {i // self.batch_size + 1}: {len(filtered_batch)} assets (after pre-gen dedup)")
 
             batch_drafts = await self.generate_terms_batch(
-                filtered_batch, usage_signals, target_glossary_qn, custom_context=custom_context
+                filtered_batch, usage_signals, target_glossary_qn, custom_context=custom_context, term_types=term_types
             )
 
             # Within-batch dedup: skip terms with duplicate names

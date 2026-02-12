@@ -96,14 +96,14 @@ function renderTerms() {
     }
 
     termsList.innerHTML = terms.map(term => `
-        <div class="term-card" data-id="${term.id}">
+        <div class="term-card${isNewTerm(term) ? ' is-new' : ''}" data-id="${term.id}">
             <input type="checkbox" class="term-checkbox"
                    ${selectedTermIds.has(term.id) ? 'checked' : ''}
                    onclick="toggleSelection(event, '${term.id}')">
             <div class="term-content" onclick="openTermModal('${term.id}')">
                 <div class="term-header">
                     <span class="term-name">${escapeHtml(term.name)}</span>
-                    ${isNewTerm(term) ? '<span class="badge badge-new">New</span>' : ''}
+                    ${isNewTerm(term) ? '<span class="badge badge-new">NEW</span>' : ''}
                     <span class="badge badge-${term.term_type || 'business_term'}">${formatTermType(term.term_type)}</span>
                     <span class="badge badge-${term.confidence}">${term.confidence}</span>
                     <span class="badge badge-${term.status}">${formatStatus(term.status)}</span>
@@ -295,6 +295,22 @@ async function publishApproved() {
     } catch (error) {
         console.error('Error publishing:', error);
         alert('Error publishing terms');
+    }
+}
+
+async function clearAllTerms() {
+    if (!confirm('Delete ALL draft terms? This cannot be undone.')) return;
+
+    try {
+        const response = await fetch('/api/v1/terms', { method: 'DELETE' });
+        const result = await response.json();
+        alert(`Deleted ${result.deleted} terms.`);
+        selectedTermIds.clear();
+        loadStats();
+        loadTerms();
+    } catch (error) {
+        console.error('Error clearing terms:', error);
+        alert('Error clearing terms');
     }
 }
 

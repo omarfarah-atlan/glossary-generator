@@ -847,14 +847,25 @@ header h1 {
 }
 
 .badge-new {
-    background: #dbeafe;
-    color: #1d4ed8;
-    font-size: 0.7rem;
-    font-weight: 600;
+    background: #059669;
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 2px 8px;
-    animation: fadeIn 0.3s ease;
+    letter-spacing: 0.8px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    animation: newPulse 2s ease-in-out infinite;
+}
+
+@keyframes newPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.term-card.is-new {
+    border-left: 4px solid #059669;
+    background: linear-gradient(90deg, #f0fdf4 0%, var(--atlan-bg-card) 8%);
 }
 
 /* Form sections */

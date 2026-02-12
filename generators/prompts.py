@@ -16,6 +16,7 @@ class PromptTemplates:
         sql_definition: Optional[str] = None,
         dbt_context: Optional[dict] = None,
         custom_context: Optional[str] = None,
+        term_types: Optional[List[str]] = None,
     ) -> str:
         """Generate a prompt for creating a glossary term definition."""
 
@@ -76,24 +77,54 @@ The following SQL shows how this asset is constructed. Use it to explain the tra
 {custom_context}
 """
 
-        prompt += """
+        # Build term type guidance based on requested types
+        requested = term_types or ["business_term", "metric", "dimension"]
+        type_guidance = []
+        if "business_term" in requested:
+            type_guidance.append("""- **business_term**: A business concept derived from this asset. Define what the concept means to the organization, its role in business processes, and how business users would understand it. Example: Table "DIM_CUSTOMER" → name: "Customer", definition: "A Customer is an individual or organization that has purchased or registered for products and services...".""")
+        if "metric" in requested:
+            type_guidance.append("""- **metric**: A measurable business value or KPI represented by this asset. Focus on what is being measured, the calculation method, units, aggregation, and business targets. Example: Table "MONTHLY_REVENUE" → name: "Monthly Revenue", definition: "Monthly Revenue is the total income generated from all sales transactions within a calendar month, measured in the organization's base currency...".""")
+        if "dimension" in requested:
+            type_guidance.append("""- **dimension**: A categorical attribute used to segment, filter, or group data in analysis. Focus on the set of possible values, hierarchies, and how analysts use it. Example: Table "EMPLOYEE_DIMENSION" → name: "Employee", definition: "An Employee is a person engaged by the organization in a professional capacity. Employees are categorized by department, role, tenure, and geographic location for workforce analysis...".""")
+
+        type_list = "\n".join(type_guidance)
+        type_values = "|".join(requested)
+
+        prompt += f"""
 ## Instructions
-Based on the information above, generate a business glossary term definition. Focus on:
-1. What this data represents in business terms
-2. How it might be used by analysts and business users
-3. Key concepts and relationships
-4. What transformations or business logic are applied (if SQL is provided)
-5. If dbt transformation context is provided, explain the metric/transformation logic in business terms
+Generate a business glossary term that describes the BUSINESS CONCEPT behind this data asset — NOT the database object itself.
+
+### Term Type
+Classify this term as the most appropriate type from the requested types below, and structure the definition accordingly:
+{type_list}
+
+Pick the single best-fitting type. If the asset name contains hints like "dim", "dimension", "fact", "metric", "kpi", "revenue", "count", "rate", use those to guide your choice.
+
+### Naming Rules (CRITICAL)
+- The term name must be a clean, singular business concept: "Customer", "Revenue", "Order", "Employee"
+- NEVER mirror the table/view name directly. "DIM_CUSTOMER" → "Customer", "FACT_ORDERS" → "Order", "employee_dimension" → "Employee"
+- Strip ALL technical suffixes/prefixes: dim, dimension, fact, table, view, vw, tbl, stg, raw, _v, _t, src, base, mart, int
+- Use singular form: "Customers" → "Customer", "Invoices" → "Invoice"
+- Use title case: "monthly revenue" → "Monthly Revenue"
+- The name should be what a business user would search for in a glossary
+
+### Definition Rules
+- NEVER say "this table", "this view", "this dataset", "this data asset", or "stores data about"
+- Define the BUSINESS CONCEPT as if you were writing a dictionary entry
+- Start with "A [concept] is..." or "The [concept] represents..."
+- Explain what it means in the business, not how it is stored technically
+- If SQL or columns provide context, explain the business logic in plain language
 
 Respond with a JSON object in this exact format:
-{
-    "name": "Business-friendly term name (convert technical names to readable format)",
-    "definition": "A comprehensive 2-4 sentence definition explaining what this data represents and its business significance",
-    "short_description": "A one-sentence summary",
+{{
+    "name": "Clean singular business concept name",
+    "term_type": "{type_values}",
+    "definition": "2-4 sentence business concept definition (never reference the table/view)",
+    "short_description": "One-sentence summary of the business concept",
     "examples": ["Example use case 1", "Example use case 2"],
     "synonyms": ["Alternative term 1", "Alternative term 2"],
     "confidence": "high|medium|low"
-}
+}}
 
 Set confidence based on:
 - "high": Clear existing description and good metadata
@@ -295,20 +326,29 @@ Focus your definition on:
 
         prompt += """
 ## Instructions
-Generate a business glossary term definition for this column. Respond with a JSON object in this exact format:
+Generate a business glossary term for this column that describes the BUSINESS CONCEPT — not the column itself.
+
+### Naming Rules
+- Use a clean, singular business concept name: "total_revenue" → "Total Revenue", "customer_segment" → "Customer Segment"
+- Strip technical prefixes/suffixes: _id, _key, _code, _flag, _ind, fk_, pk_
+- Use title case
+- The name should be what a business user would look up in a glossary
+
+### Definition Rules
+- NEVER say "this column", "this field", "this attribute", or "stores the value of"
+- Define the BUSINESS CONCEPT: what it means to the business, not where it is stored
+- For metrics: explain what is being measured, how it's calculated, and what units it uses
+- For dimensions: explain what categories or groupings it represents and how it's used in analysis
+
+Respond with a JSON object in this exact format:
 {
-    "name": "Business-friendly term name (convert technical column names to readable format)",
-    "definition": "A comprehensive 2-4 sentence definition explaining what this data represents and its business significance",
-    "short_description": "A one-sentence summary",
+    "name": "Clean business concept name in title case",
+    "definition": "2-4 sentence business concept definition (never reference the column/field)",
+    "short_description": "One-sentence summary",
     "examples": ["Example use case 1", "Example use case 2"],
-    "synonyms": ["Alternative term 1", "Alternative term 2"],
+    "synonyms": ["Alternative term 1"],
     "confidence": "high|medium|low"
 }
-
-Set confidence based on:
-- "high": Clear description and data type make the purpose obvious
-- "medium": Some context available but not comprehensive
-- "low": Limited information, mostly inferred from name
 
 Respond ONLY with the JSON object, no additional text."""
 

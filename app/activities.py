@@ -208,13 +208,15 @@ class GlossaryActivities:
         target_glossary_qn: str,
         existing_term_names: Optional[List[str]] = None,
         custom_context: Optional[str] = None,
+        term_types: Optional[List[str]] = None,
     ) -> List[dict]:
         """Generate term definitions using LLM."""
         try:
             assets = [AssetMetadata(**a) for a in assets_dict]
             usage_signals = {qn: UsageSignals(**u) for qn, u in usage_dict.items()}
 
-            activity.heartbeat(f"Starting asset-level term generation for {len(assets)} assets...")
+            type_label = ", ".join(term_types) if term_types else "all types"
+            activity.heartbeat(f"Generating {type_label} terms for {len(assets)} assets...")
 
             drafts = await self.term_generator.generate_all_terms(
                 assets,
@@ -222,9 +224,10 @@ class GlossaryActivities:
                 target_glossary_qn,
                 existing_term_names=set(existing_term_names or []),
                 custom_context=custom_context,
+                term_types=term_types,
             )
 
-            activity.heartbeat(f"Completed: generated {len(drafts)} asset-level terms")
+            activity.heartbeat(f"Completed: generated {len(drafts)} terms")
             logger.info(f"Generated {len(drafts)} term definitions")
             return [d.model_dump() for d in drafts]
 
@@ -358,6 +361,12 @@ class GlossaryActivities:
         try:
             assets = [AssetMetadata(**a) for a in assets_dict]
             usage_signals = {qn: UsageSignals(**u) for qn, u in usage_dict.items()}
+
+            # Fetch column metadata if not already present
+            assets_without_cols = [a for a in assets if not a.columns]
+            if assets_without_cols:
+                activity.heartbeat(f"Fetching column metadata for {len(assets_without_cols)} assets...")
+                assets = await self.atlan_client.fetch_columns_for_assets(assets)
 
             # Which column-level types are requested
             allowed_types = set(term_types or ["metric", "dimension"])

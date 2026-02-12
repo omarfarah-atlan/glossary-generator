@@ -158,6 +158,7 @@ class ClaudeClient:
         sql_definition: Optional[str] = None,
         dbt_context: Optional[dict] = None,
         custom_context: Optional[str] = None,
+        term_types: Optional[list] = None,
     ) -> dict:
         """Generate a glossary term definition for an asset."""
         from generators.prompts import PromptTemplates
@@ -171,6 +172,7 @@ class ClaudeClient:
             sql_definition=sql_definition,
             dbt_context=dbt_context,
             custom_context=custom_context,
+            term_types=term_types,
         )
 
         return await self.generate_json(prompt)

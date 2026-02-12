@@ -130,53 +130,25 @@ class GlossaryGenerationWorkflow:
         # Step 5: Generate term definitions (50%)
         self._status = "generating_definitions"
         self._progress = 50
-        self._log(f"Generating glossary definitions for {len(prioritized)} assets using LLM... (this may take a few minutes)", "generating_definitions")
+        self._log(f"Generating glossary terms for {len(prioritized)} assets ({selected_labels})...", "generating_definitions")
 
         terms_dict = await workflow.execute_activity(
             GlossaryActivities.generate_term_definitions,
-            args=[prioritized, usage_dict, config.target_glossary_qn, existing_term_names, config.custom_context],
+            args=[prioritized, usage_dict, config.target_glossary_qn, existing_term_names, config.custom_context, config.term_types],
             start_to_close_timeout=timedelta(minutes=30),
             heartbeat_timeout=timedelta(minutes=5),
             retry_policy=RetryPolicy(maximum_attempts=2),
         )
 
+        self._log(f"Generated {len(terms_dict)} term definitions.", "generating_definitions")
+
+        # Check if anything was generated
         if not terms_dict:
             result.status = "completed"
             result.error_message = "No terms generated"
             self._status = "completed"
-            self._log("Completed: LLM did not generate any terms.", "completed")
+            self._log("Completed: no terms were generated. Try different settings or more assets.", "completed")
             return result.model_dump()
-
-        self._log(f"Generated {len(terms_dict)} asset-level term definitions.", "generating_definitions")
-
-        # Step 5b: Classify columns and generate column-level terms (65%)
-        # Run if any column-level types (metric, dimension, kpi) are requested
-        column_types = [t for t in config.term_types if t in ("metric", "dimension")]
-        if column_types:
-            type_labels = {"metric": "Metrics", "dimension": "Dimensions"}
-            requested_labels = ", ".join(type_labels.get(t, t) for t in column_types)
-            self._status = "classifying_columns"
-            self._progress = 65
-            self._log(f"Classifying columns across {len(prioritized)} assets for: {requested_labels}...", "classifying_columns")
-
-            # Collect asset-level term names for dedup
-            asset_term_names = existing_term_names + [t.get("name", "") for t in terms_dict]
-
-            column_terms_dict = await workflow.execute_activity(
-                GlossaryActivities.classify_and_generate_column_terms,
-                args=[prioritized, usage_dict, config.target_glossary_qn, asset_term_names, config.custom_context, config.term_types],
-                start_to_close_timeout=timedelta(minutes=30),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=RetryPolicy(maximum_attempts=2),
-            )
-
-            if column_terms_dict:
-                self._log(f"Generated {len(column_terms_dict)} column-level terms ({requested_labels}).", "classifying_columns")
-                terms_dict.extend(column_terms_dict)
-            else:
-                self._log("No column-level terms generated.", "classifying_columns")
-        else:
-            self._log("Skipping column-level terms (no column types selected).", "generating_definitions")
 
         # Trim to max_terms limit
         if len(terms_dict) > config.max_terms:

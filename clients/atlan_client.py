@@ -9,6 +9,7 @@ from pyatlan.model.assets import (
     AtlasGlossaryCategory,
     AtlasGlossaryTerm,
     Asset,
+    Column,
     Connection,
     Table,
     View,
@@ -138,6 +139,49 @@ class AtlanMetadataClient:
         except Exception as e:
             logger.warning(f"Error converting asset {getattr(asset, 'name', 'unknown')}: {e}")
             return None
+
+    async def fetch_columns_for_assets(self, assets: List[AssetMetadata]) -> List[AssetMetadata]:
+        """Fetch column metadata for a list of assets and enrich them."""
+        if not assets:
+            return assets
+
+        qn_to_asset = {a.qualified_name: a for a in assets}
+        asset_qns = list(qn_to_asset.keys())
+
+        try:
+            search = (
+                FluentSearch()
+                .where(Column.TYPE_NAME.eq("Column"))
+                .where(Column.TABLE_QUALIFIED_NAME.within(asset_qns))
+                .page_size(1000)
+            )
+
+            results = self.client.asset.search(search.to_request())
+            col_count = 0
+
+            for col in results:
+                parent_qn = getattr(col, "table_qualified_name", None)
+                if not parent_qn or parent_qn not in qn_to_asset:
+                    continue
+
+                col_meta = ColumnMetadata(
+                    name=col.name,
+                    data_type=getattr(col, "data_type", None),
+                    description=getattr(col, "description", None) or getattr(col, "user_description", None),
+                    is_primary_key=getattr(col, "is_primary", False) or False,
+                    is_foreign_key=getattr(col, "is_foreign", False) or False,
+                    is_nullable=getattr(col, "is_nullable", True) if getattr(col, "is_nullable", None) is not None else True,
+                )
+                qn_to_asset[parent_qn].columns.append(col_meta)
+                col_count += 1
+
+            enriched = sum(1 for a in assets if a.columns)
+            logger.info(f"Fetched {col_count} columns for {enriched}/{len(assets)} assets")
+
+        except Exception as e:
+            logger.warning(f"Could not fetch columns (continuing without): {e}")
+
+        return assets
 
     async def fetch_dbt_models_for_assets(self, assets: List[AssetMetadata]) -> List[AssetMetadata]:
         """Fetch dbt model metadata linked to SQL assets and enrich AssetMetadata objects."""

@@ -425,6 +425,39 @@ async def publish_terms(request: PublishRequest):
     return results
 
 
+@router.delete("/api/v1/terms")
+async def clear_all_terms():
+    """Delete all draft terms and batch indexes from the state store."""
+    if _get_dapr_client() is None:
+        raise HTTPException(status_code=503, detail="State store unavailable")
+
+    deleted = 0
+    try:
+        from dapr.clients import DaprClient
+        with DaprClient() as client:
+            master_state = client.get_state(store_name=DAPR_STORE_NAME, key="glossary_batch_index")
+            if master_state.data:
+                master = json.loads(master_state.data)
+                for batch_id in master.get("batch_ids", []):
+                    batch_key = f"glossary_batch_{batch_id}"
+                    batch_state = client.get_state(store_name=DAPR_STORE_NAME, key=batch_key)
+                    if batch_state.data:
+                        batch = json.loads(batch_state.data)
+                        for term_id in batch.get("term_ids", []):
+                            client.delete_state(store_name=DAPR_STORE_NAME, key=f"glossary_term_{term_id}")
+                            deleted += 1
+                    client.delete_state(store_name=DAPR_STORE_NAME, key=batch_key)
+                client.delete_state(store_name=DAPR_STORE_NAME, key="glossary_batch_index")
+
+        _mark_dapr_available(True)
+        logger.info(f"Cleared {deleted} draft terms and all batch indexes")
+        return {"deleted": deleted}
+    except Exception as e:
+        _mark_dapr_available(False)
+        logger.error(f"Error clearing terms: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/api/v1/stats")
 async def get_stats():
     """Get statistics about draft terms."""
