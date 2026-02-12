@@ -8,6 +8,7 @@ from pyatlan.model.assets import (
     AtlasGlossary,
     AtlasGlossaryTerm,
     Asset,
+    Connection,
     Table,
     View,
 )
@@ -174,4 +175,94 @@ class AtlanMetadataClient:
 
         except Exception as e:
             logger.error(f"Error fetching existing terms: {e}")
+            return []
+
+    async def get_all_glossaries(self) -> List[dict]:
+        """Fetch all glossaries from Atlan."""
+        try:
+            search = (
+                FluentSearch()
+                .where(AtlasGlossary.TYPE_NAME.eq("AtlasGlossary"))
+                .page_size(100)
+            )
+
+            results = self.client.asset.search(search.to_request())
+            glossaries = []
+
+            for glossary in results:
+                glossaries.append({
+                    "name": glossary.name,
+                    "qualified_name": glossary.qualified_name,
+                    "description": getattr(glossary, "description", None),
+                })
+
+            logger.info(f"Fetched {len(glossaries)} glossaries from Atlan")
+            return glossaries
+
+        except Exception as e:
+            logger.error(f"Error fetching glossaries: {e}")
+            return []
+
+    async def get_all_connections(self, connector_type: Optional[str] = None) -> List[dict]:
+        """Fetch all connections from Atlan, optionally filtered by connector type."""
+        try:
+            search = FluentSearch().where(Connection.TYPE_NAME.eq("Connection"))
+
+            if connector_type:
+                search = search.where(Connection.CONNECTOR_NAME.eq(connector_type.lower()))
+
+            search = search.page_size(100)
+
+            results = self.client.asset.search(search.to_request())
+            connections = []
+
+            for conn in results:
+                connector_name = getattr(conn, "connector_name", None) or getattr(conn, "connector_type", "unknown")
+                connections.append({
+                    "name": conn.name,
+                    "qualified_name": conn.qualified_name,
+                    "connector_name": connector_name,
+                    "status": getattr(conn, "connection_status", None),
+                })
+
+            logger.info(f"Fetched {len(connections)} connections from Atlan" +
+                       (f" for connector {connector_type}" if connector_type else ""))
+            return connections
+
+        except Exception as e:
+            logger.error(f"Error fetching connections: {e}")
+            return []
+
+    async def get_connector_types(self) -> List[dict]:
+        """Get all unique connector types from connections."""
+        try:
+            search = (
+                FluentSearch()
+                .where(Connection.TYPE_NAME.eq("Connection"))
+                .page_size(100)
+            )
+
+            results = self.client.asset.search(search.to_request())
+            connector_types = set()
+
+            for conn in results:
+                connector_name = getattr(conn, "connector_name", None) or getattr(conn, "connector_type", None)
+                if connector_name:
+                    connector_types.add(connector_name)
+
+            # Convert to list of dicts with display names
+            connectors = []
+            for conn_type in sorted(connector_types):
+                # Capitalize for display
+                display_name = conn_type.replace("-", " ").title()
+                connectors.append({
+                    "value": conn_type,
+                    "label": display_name,
+                })
+
+            logger.info(f"Found {len(connectors)} connector types")
+            return connectors
+
+        except Exception as e:
+            logger.error(f"Error fetching connector types: {e}")
             return []

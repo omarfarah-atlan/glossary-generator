@@ -24,10 +24,27 @@
                 <h2>Start Generation Workflow</h2>
                 <form id="workflowForm">
                     <div class="form-group">
-                        <label for="glossaryQn">Target Glossary Qualified Name</label>
-                        <input type="text" id="glossaryQn" name="target_glossary_qn"
-                               placeholder="default/glossary/business-glossary" required>
-                        <small>The qualified name of the glossary where terms will be created</small>
+                        <label for="glossarySelect">Target Glossary</label>
+                        <select id="glossarySelect" name="target_glossary" required>
+                            <option value="">Loading glossaries...</option>
+                        </select>
+                        <small>Select the glossary where terms will be created</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="connectorSelect">Connector Type</label>
+                        <select id="connectorSelect" name="connector_type">
+                            <option value="">Loading connectors...</option>
+                        </select>
+                        <small>Select the data connector type</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="connectionSelect">Connection</label>
+                        <select id="connectionSelect" name="connection_qn">
+                            <option value="">Select a connector type first</option>
+                        </select>
+                        <small>Select a specific connection (filtered by connector type)</small>
                     </div>
 
                     <div class="form-group">
@@ -101,16 +118,11 @@
         const startBtn = document.getElementById('startBtn');
         let pollInterval = null;
 
-        // Load settings on page load
+        // Load settings and dropdowns on page load
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const response = await fetch('/api/v1/settings');
                 const settings = await response.json();
-
-                // Auto-populate default glossary if configured
-                if (settings.default_glossary_qn) {
-                    document.getElementById('glossaryQn').value = settings.default_glossary_qn;
-                }
 
                 // Show warning if not configured
                 if (!settings.is_configured) {
@@ -125,7 +137,113 @@
             } catch (error) {
                 console.error('Error loading settings:', error);
             }
+
+            // Load glossaries
+            await loadGlossaries();
+
+            // Load connectors
+            await loadConnectors();
+
+            // Set up connector change handler
+            document.getElementById('connectorSelect').addEventListener('change', async (e) => {
+                await loadConnections(e.target.value);
+            });
         });
+
+        async function loadGlossaries() {
+            const glossarySelect = document.getElementById('glossarySelect');
+            try {
+                const response = await fetch('/api/v1/glossaries');
+                const data = await response.json();
+
+                glossarySelect.innerHTML = '<option value="">Select a glossary</option>';
+
+                if (data.glossaries && data.glossaries.length > 0) {
+                    let foundGlossaryBuddy = false;
+
+                    data.glossaries.forEach(glossary => {
+                        const option = document.createElement('option');
+                        option.value = glossary.qualified_name;
+                        option.textContent = glossary.name;
+
+                        // Set "Glossary Buddy" as default if it exists
+                        if (glossary.name === "Glossary Buddy") {
+                            option.selected = true;
+                            foundGlossaryBuddy = true;
+                        }
+
+                        glossarySelect.appendChild(option);
+                    });
+
+                    console.log(`Loaded ${data.glossaries.length} glossaries` +
+                               (foundGlossaryBuddy ? ' (Glossary Buddy set as default)' : ''));
+                } else {
+                    glossarySelect.innerHTML = '<option value="">No glossaries found</option>';
+                }
+            } catch (error) {
+                console.error('Error loading glossaries:', error);
+                glossarySelect.innerHTML = '<option value="">Error loading glossaries</option>';
+            }
+        }
+
+        async function loadConnectors() {
+            const connectorSelect = document.getElementById('connectorSelect');
+            try {
+                const response = await fetch('/api/v1/connectors');
+                const data = await response.json();
+
+                connectorSelect.innerHTML = '<option value="">All Connectors</option>';
+
+                if (data.connectors && data.connectors.length > 0) {
+                    data.connectors.forEach(connector => {
+                        const option = document.createElement('option');
+                        option.value = connector.value;
+                        option.textContent = connector.label;
+                        connectorSelect.appendChild(option);
+                    });
+
+                    console.log(`Loaded ${data.connectors.length} connector types`);
+                }
+            } catch (error) {
+                console.error('Error loading connectors:', error);
+                connectorSelect.innerHTML = '<option value="">Error loading connectors</option>';
+            }
+        }
+
+        async function loadConnections(connectorType) {
+            const connectionSelect = document.getElementById('connectionSelect');
+
+            if (!connectorType) {
+                connectionSelect.innerHTML = '<option value="">Select a connector type first</option>';
+                return;
+            }
+
+            connectionSelect.innerHTML = '<option value="">Loading connections...</option>';
+
+            try {
+                const url = `/api/v1/connections?connector_type=${encodeURIComponent(connectorType)}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                connectionSelect.innerHTML = '<option value="">All Connections</option>';
+
+                if (data.connections && data.connections.length > 0) {
+                    data.connections.forEach(connection => {
+                        const option = document.createElement('option');
+                        option.value = connection.qualified_name;
+                        option.textContent = connection.name;
+                        connectionSelect.appendChild(option);
+                    });
+
+                    console.log(`Loaded ${data.connections.length} connections for ${connectorType}`);
+                } else {
+                    connectionSelect.innerHTML = '<option value="">No connections found</option>';
+                }
+            } catch (error) {
+                console.error('Error loading connections:', error);
+                connectionSelect.innerHTML = '<option value="">Error loading connections</option>';
+            }
+        }
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -134,7 +252,9 @@
 
             const formData = new FormData(form);
             const config = {
-                target_glossary_qn: formData.get('target_glossary_qn'),
+                target_glossary_qn: document.getElementById('glossarySelect').value,
+                connector_type: document.getElementById('connectorSelect').value || null,
+                connection_qualified_name: document.getElementById('connectionSelect').value || null,
                 asset_types: Array.from(document.getElementById('assetTypes').selectedOptions).map(o => o.value),
                 max_assets: parseInt(formData.get('max_assets')),
                 min_popularity_score: parseFloat(formData.get('min_popularity_score')),

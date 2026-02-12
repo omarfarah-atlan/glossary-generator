@@ -96,6 +96,36 @@ class GlossaryGeneratorApp:
             """Health check endpoint."""
             return {"status": "healthy"}
 
+        @self.app.get("/api/v1/glossaries")
+        async def get_glossaries():
+            """Get all glossaries from Atlan."""
+            try:
+                glossaries = await self.activities.atlan_client.get_all_glossaries()
+                return {"glossaries": glossaries}
+            except Exception as e:
+                logger.error(f"Error fetching glossaries: {e}")
+                return {"error": str(e), "glossaries": []}
+
+        @self.app.get("/api/v1/connectors")
+        async def get_connectors():
+            """Get all connector types."""
+            try:
+                connectors = await self.activities.atlan_client.get_connector_types()
+                return {"connectors": connectors}
+            except Exception as e:
+                logger.error(f"Error fetching connectors: {e}")
+                return {"error": str(e), "connectors": []}
+
+        @self.app.get("/api/v1/connections")
+        async def get_connections(connector_type: str = None):
+            """Get all connections, optionally filtered by connector type."""
+            try:
+                connections = await self.activities.atlan_client.get_all_connections(connector_type)
+                return {"connections": connections}
+            except Exception as e:
+                logger.error(f"Error fetching connections: {e}")
+                return {"error": str(e), "connections": []}
+
     async def connect_temporal(self):
         """Connect to Temporal server."""
         try:
