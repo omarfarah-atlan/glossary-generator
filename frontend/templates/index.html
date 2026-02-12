@@ -3,82 +3,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Glossary Generator</title>
+    <title>Glossary Generator - Atlan</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232026d2'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white' font-family='system-ui'>G</text></svg>">
 </head>
 <body>
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
     <div class="container">
         <header>
-            <h1>Business Glossary Generator</h1>
-            <p class="subtitle">Auto-generate glossary terms from your data catalog metadata</p>
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo-icon">
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                            <rect width="32" height="32" rx="8" fill="#2026d2"/>
+                            <path d="M9 12h6v2H9v-2zm0 4h14v2H9v-2zm0 4h10v2H9v-2z" fill="white"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1>Business Glossary Generator</h1>
+                        <p class="subtitle">AI-powered glossary terms from your data catalog</p>
+                    </div>
+                </div>
+                <div class="header-badge">
+                    <span class="beta-badge">Beta</span>
+                </div>
+            </div>
         </header>
 
         <nav class="nav-tabs">
-            <a href="/" class="nav-tab active">Generate</a>
-            <a href="/review" class="nav-tab">Review Terms</a>
-            <a href="/settings" class="nav-tab">Settings</a>
+            <a href="/" class="nav-tab active">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 2l6 4v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6l6-4z"/>
+                </svg>
+                Generate
+            </a>
+            <a href="/review" class="nav-tab">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M3 3h10a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1zm2 3h6v1H5V6zm0 3h4v1H5V9z"/>
+                </svg>
+                Review Terms
+            </a>
+            <a href="/settings" class="nav-tab">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 10a2 2 0 100-4 2 2 0 000 4z"/>
+                    <path d="M9.5 2.5l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5-1.5-.5 1.5-.5.5-1.5z"/>
+                </svg>
+                Settings
+            </a>
         </nav>
 
         <main>
-            <section class="card">
-                <h2>Start Generation Workflow</h2>
+            <!-- Quick Stats -->
+            <div class="quick-stats">
+                <div class="stat-item">
+                    <div class="stat-icon stat-icon-primary">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 5h2v6H9V5zm0 8h2v2H9v-2z"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="dataSourceLabel">MDLH Direct</div>
+                        <div class="stat-label">Data Source</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon stat-icon-success">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 3a7 7 0 100 14 7 7 0 000-14zm3.5 6l-4 4-2-2 .7-.7 1.3 1.3 3.3-3.3.7.7z"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value">AI-Powered</div>
+                        <div class="stat-label">Claude Sonnet 4</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon stat-icon-info">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M4 4h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm2 4h8v1H6V8zm0 3h6v1H6v-1z"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value">Auto-Review</div>
+                        <div class="stat-label">Quality Checks</div>
+                    </div>
+                </div>
+            </div>
+
+            <section class="card main-card">
+                <div class="card-header-section">
+                    <h2>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 2l5 3v5a6 6 0 01-5 5.9A6 6 0 015 10V5l5-3z"/>
+                        </svg>
+                        Configure Generation Workflow
+                    </h2>
+                    <p class="card-description">Select your target glossary and data sources to generate AI-powered term definitions</p>
+                </div>
+
                 <form id="workflowForm">
-                    <div class="form-group">
-                        <label for="glossarySelect">Target Glossary</label>
-                        <select id="glossarySelect" name="target_glossary" required>
-                            <option value="">Loading glossaries...</option>
-                        </select>
-                        <small>Select the glossary where terms will be created</small>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="glossarySelect">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="label-icon">
+                                    <path d="M2 2h10a1 1 0 011 1v8a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1z"/>
+                                </svg>
+                                Target Glossary
+                                <span class="required">*</span>
+                            </label>
+                            <div class="select-wrapper">
+                                <select id="glossarySelect" name="target_glossary" required>
+                                    <option value="">Loading glossaries...</option>
+                                </select>
+                                <svg class="select-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                                    <path d="M6 8L2 4h8L6 8z"/>
+                                </svg>
+                            </div>
+                            <small>Glossary where AI-generated terms will be saved for review</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="connectorSelect">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="label-icon">
+                                    <path d="M7 1a6 6 0 100 12A6 6 0 007 1zm0 9l-3-3h6L7 10z"/>
+                                </svg>
+                                Connector Type
+                            </label>
+                            <div class="select-wrapper">
+                                <select id="connectorSelect" name="connector_type">
+                                    <option value="">Loading connectors...</option>
+                                </select>
+                                <svg class="select-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                                    <path d="M6 8L2 4h8L6 8z"/>
+                                </svg>
+                            </div>
+                            <small>Filter assets by data source type (optional)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="connectionSelect">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="label-icon">
+                                    <path d="M12 6H8V2a1 1 0 00-2 0v4H2a1 1 0 000 2h4v4a1 1 0 002 0V8h4a1 1 0 000-2z"/>
+                                </svg>
+                                Specific Connection
+                            </label>
+                            <div class="select-wrapper">
+                                <select id="connectionSelect" name="connection_qn">
+                                    <option value="">Select a connector type first</option>
+                                </select>
+                                <svg class="select-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                                    <path d="M6 8L2 4h8L6 8z"/>
+                                </svg>
+                            </div>
+                            <small>Narrow down to a specific connection (optional)</small>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="connectorSelect">Connector Type</label>
-                        <select id="connectorSelect" name="connector_type">
-                            <option value="">Loading connectors...</option>
-                        </select>
-                        <small>Select the data connector type</small>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-large" id="startBtn">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M4 3l8 5-8 5V3z"/>
+                            </svg>
+                            <span class="btn-text">Start Generation</span>
+                            <span class="btn-loader" style="display: none;">
+                                <svg class="spinner" width="16" height="16" viewBox="0 0 16 16">
+                                    <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="30" stroke-dashoffset="0"/>
+                                </svg>
+                            </span>
+                        </button>
+                        <div class="form-hint">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                <path d="M7 1a6 6 0 100 12A6 6 0 007 1zm0 3v4h1V4H7zm0 6h1v1H7v-1z"/>
+                            </svg>
+                            Generation typically takes 2-5 minutes for 10 assets
+                        </div>
                     </div>
-
-                    <div class="form-group">
-                        <label for="connectionSelect">Connection</label>
-                        <select id="connectionSelect" name="connection_qn">
-                            <option value="">Select a connector type first</option>
-                        </select>
-                        <small>Select a specific connection (filtered by connector type)</small>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary" id="startBtn">
-                        Start Generation
-                    </button>
                 </form>
             </section>
 
-            <section class="card" id="statusSection" style="display: none;">
-                <h2>Workflow Status</h2>
-                <div class="status-container">
-                    <div class="status-info">
-                        <span class="status-label">Workflow ID:</span>
-                        <span id="workflowId" class="status-value">-</span>
-                    </div>
-                    <div class="status-info">
-                        <span class="status-label">Status:</span>
-                        <span id="workflowStatus" class="status-value badge">-</span>
-                    </div>
-                    <div class="status-info">
-                        <span id="workflowMessage" class="status-value" style="font-size: 0.9rem; color: var(--text-muted);">-</span>
-                    </div>
-                    <div class="progress-container">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+            <section class="card status-card" id="statusSection" style="display: none;">
+                <div class="card-header-section">
+                    <h2>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-2h2v2zm0-4H9V5h2v4z"/>
+                        </svg>
+                        Workflow Progress
+                    </h2>
+                </div>
+
+                <div class="status-container-enhanced">
+                    <div class="status-main">
+                        <div class="status-info-row">
+                            <div class="status-info-item">
+                                <span class="status-label">Workflow ID</span>
+                                <code id="workflowId" class="status-code">-</code>
+                            </div>
+                            <div class="status-info-item">
+                                <span class="status-label">Current Status</span>
+                                <span id="workflowStatus" class="status-value badge">-</span>
+                            </div>
                         </div>
-                        <span id="progressText">0%</span>
+
+                        <div class="status-message-box">
+                            <svg class="status-message-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 3v5h1V4H8zm0 7h1v1H8v-1z"/>
+                            </svg>
+                            <span id="workflowMessage" class="status-message">-</span>
+                        </div>
+
+                        <div class="progress-section">
+                            <div class="progress-header">
+                                <span class="progress-label">Progress</span>
+                                <span id="progressText" class="progress-percentage">0%</span>
+                            </div>
+                            <div class="progress-bar-enhanced">
+                                <div class="progress-fill-enhanced" id="progressBar" style="width: 0%">
+                                    <div class="progress-shine"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
         </main>
 
         <footer>
-            <p>Powered by Atlan Application SDK</p>
+            <div class="footer-content">
+                <p>Powered by <strong>Atlan Application SDK</strong> • AI by <strong>Claude Sonnet 4</strong></p>
+                <p class="footer-meta">© 2026 Atlan • Business Glossary Generator v1.0</p>
+            </div>
         </footer>
     </div>
 
@@ -86,7 +241,49 @@
         const form = document.getElementById('workflowForm');
         const statusSection = document.getElementById('statusSection');
         const startBtn = document.getElementById('startBtn');
+        const btnText = startBtn.querySelector('.btn-text');
+        const btnLoader = startBtn.querySelector('.btn-loader');
         let pollInterval = null;
+
+        // Toast notification system
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            
+            const icons = {
+                success: '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm3.5 6.5l-4 4-2-2 .7-.7 1.3 1.3 3.3-3.3.7.7z"/></svg>',
+                error: '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-2h2v2zm0-4H9V5h2v4z"/></svg>',
+                warning: '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10 1l9 16H1L10 1zm1 12H9v2h2v-2zm0-6H9v4h2V7z"/></svg>',
+                info: '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-2h2v2zm0-4H9V5h2v4z"/></svg>'
+            };
+            
+            toast.innerHTML = `
+                <div class="toast-icon">${icons[type] || icons.info}</div>
+                <div class="toast-message">${message}</div>
+                <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+            `;
+            
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+
+        // Set loading state
+        function setLoading(loading) {
+            startBtn.disabled = loading;
+            if (loading) {
+                btnText.style.display = 'none';
+                btnLoader.style.display = 'inline-flex';
+            } else {
+                btnText.style.display = 'inline';
+                btnLoader.style.display = 'none';
+            }
+        }
 
         // Load settings and dropdowns on page load
         document.addEventListener('DOMContentLoaded', async () => {
@@ -96,16 +293,16 @@
 
                 // Show warning if not configured
                 if (!settings.is_configured) {
-                    const warning = document.createElement('div');
-                    warning.className = 'card warning-card';
-                    warning.innerHTML = `
-                        <p><strong>Settings not configured.</strong>
-                        Please <a href="/settings">configure your API credentials</a> before running the workflow.</p>
-                    `;
-                    document.querySelector('main').insertBefore(warning, document.querySelector('main').firstChild);
+                    showToast('⚠️ Please configure your API credentials in Settings before starting', 'warning');
                 }
+
+                // Update data source label
+                const useMDLH = settings.snowflake_account && settings.snowflake_user;
+                document.getElementById('dataSourceLabel').textContent = useMDLH ? 'MDLH Direct' : 'Atlan SDK';
+                
             } catch (error) {
                 console.error('Error loading settings:', error);
+                showToast('Failed to load application settings', 'error');
             }
 
             // Load glossaries
@@ -145,14 +342,16 @@
                         glossarySelect.appendChild(option);
                     });
 
-                    console.log(`Loaded ${data.glossaries.length} glossaries` +
+                    console.log(`✓ Loaded ${data.glossaries.length} glossaries` +
                                (foundGlossaryBuddy ? ' (Glossary Buddy set as default)' : ''));
                 } else {
                     glossarySelect.innerHTML = '<option value="">No glossaries found</option>';
+                    showToast('No glossaries found in your Atlan instance', 'warning');
                 }
             } catch (error) {
                 console.error('Error loading glossaries:', error);
                 glossarySelect.innerHTML = '<option value="">Error loading glossaries</option>';
+                showToast('Failed to load glossaries. Check your connection.', 'error');
             }
         }
 
@@ -172,11 +371,12 @@
                         connectorSelect.appendChild(option);
                     });
 
-                    console.log(`Loaded ${data.connectors.length} connector types`);
+                    console.log(`✓ Loaded ${data.connectors.length} connector types`);
                 }
             } catch (error) {
                 console.error('Error loading connectors:', error);
                 connectorSelect.innerHTML = '<option value="">Error loading connectors</option>';
+                showToast('Failed to load connector types', 'error');
             }
         }
 
@@ -205,29 +405,37 @@
                         connectionSelect.appendChild(option);
                     });
 
-                    console.log(`Loaded ${data.connections.length} connections for ${connectorType}`);
+                    console.log(`✓ Loaded ${data.connections.length} connections for ${connectorType}`);
                 } else {
                     connectionSelect.innerHTML = '<option value="">No connections found</option>';
+                    showToast(`No connections found for ${connectorType}`, 'info');
                 }
             } catch (error) {
                 console.error('Error loading connections:', error);
                 connectionSelect.innerHTML = '<option value="">Error loading connections</option>';
+                showToast('Failed to load connections', 'error');
             }
         }
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            startBtn.disabled = true;
-            startBtn.textContent = 'Starting...';
+            setLoading(true);
+
+            const glossaryQn = document.getElementById('glossarySelect').value;
+            if (!glossaryQn) {
+                showToast('Please select a target glossary', 'warning');
+                setLoading(false);
+                return;
+            }
 
             const config = {
-                target_glossary_qn: document.getElementById('glossarySelect').value,
+                target_glossary_qn: glossaryQn,
                 connector_type: document.getElementById('connectorSelect').value || null,
                 connection_qualified_name: document.getElementById('connectionSelect').value || null,
-                asset_types: ["Table", "View", "MaterializedView"],  // Hard-coded
-                max_assets: 10,  // Hard-coded to 10
-                min_popularity_score: 0,  // Hard-coded
-                batch_size: 10,  // Hard-coded
+                asset_types: ["Table", "View", "MaterializedView"],
+                max_assets: 10,
+                min_popularity_score: 0,
+                batch_size: 10,
             };
 
             try {
@@ -240,20 +448,20 @@
                 const result = await response.json();
 
                 if (result.error) {
-                    alert('Error: ' + result.error);
-                    startBtn.disabled = false;
-                    startBtn.textContent = 'Start Generation';
+                    showToast(`Failed to start workflow: ${result.error}`, 'error');
+                    setLoading(false);
                     return;
                 }
 
                 document.getElementById('workflowId').textContent = result.workflow_id;
                 statusSection.style.display = 'block';
+                statusSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                showToast('🚀 Workflow started successfully!', 'success');
                 startPolling(result.workflow_id);
 
             } catch (error) {
-                alert('Error starting workflow: ' + error.message);
-                startBtn.disabled = false;
-                startBtn.textContent = 'Start Generation';
+                showToast(`Error starting workflow: ${error.message}`, 'error');
+                setLoading(false);
             }
         });
 
@@ -270,28 +478,36 @@
                 const statusEl = document.getElementById('workflowStatus');
                 const progressBar = document.getElementById('progressBar');
                 const progressText = document.getElementById('progressText');
+                const messageEl = document.getElementById('workflowMessage');
 
-                statusEl.textContent = data.status || 'unknown';
+                // Format status text
+                const statusText = (data.status || 'unknown').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                statusEl.textContent = statusText;
                 statusEl.className = 'status-value badge badge-' + (data.status || 'unknown');
 
-                const messageEl = document.getElementById('workflowMessage');
-                messageEl.textContent = data.message || '';
+                // Update message
+                messageEl.textContent = data.message || 'Processing...';
 
+                // Smooth progress animation
                 const progress = data.progress || 0;
                 progressBar.style.width = progress + '%';
                 progressText.textContent = progress + '%';
 
+                // Handle completion
                 if (data.status === 'completed' || data.status === 'failed') {
                     clearInterval(pollInterval);
-                    startBtn.disabled = false;
-                    startBtn.textContent = 'Start New Generation';
+                    setLoading(false);
+                    btnText.textContent = 'Start New Generation';
 
                     if (data.status === 'completed') {
+                        showToast('✨ Generation completed successfully! Review your terms now.', 'success');
                         setTimeout(() => {
                             if (confirm('Generation complete! Would you like to review the generated terms?')) {
                                 window.location.href = '/review';
                             }
                         }, 500);
+                    } else if (data.status === 'failed') {
+                        showToast(`❌ Workflow failed: ${data.message || 'Unknown error'}`, 'error');
                     }
                 }
 
