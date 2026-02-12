@@ -81,7 +81,8 @@ class ClaudeClient:
         asset_type: str,
         description: Optional[str] = None,
         columns: Optional[list] = None,
-        usage_stats: Optional[dict] = None
+        usage_stats: Optional[dict] = None,
+        dax_expression: Optional[str] = None
     ) -> dict:
         """Generate a glossary term definition for an asset."""
         from generators.prompts import PromptTemplates
@@ -91,7 +92,8 @@ class ClaudeClient:
             asset_type=asset_type,
             description=description,
             columns=columns,
-            usage_stats=usage_stats
+            usage_stats=usage_stats,
+            dax_expression=dax_expression
         )
 
         return await self.generate_json(prompt)

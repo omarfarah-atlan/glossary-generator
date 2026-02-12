@@ -11,6 +11,7 @@ from pyatlan.model.assets import (
     Asset,
     Table,
     View,
+    PowerBIMeasure,
 )
 from pyatlan.model.fluent_search import FluentSearch
 from pyatlan.model.enums import AtlanConnectorType
@@ -83,7 +84,38 @@ class AtlanMetadataClient:
         assets = []
 
         try:
-            # Build search for SQL assets with descriptions
+            # Separate SQL and PowerBI asset types
+            sql_types = [t for t in asset_types if t in ["Table", "View", "MaterializedView"]]
+            powerbi_types = [t for t in asset_types if t.startswith("PowerBI")]
+
+            # Fetch SQL assets
+            if sql_types:
+                sql_assets = await self._fetch_sql_assets(sql_types, max_results, min_popularity)
+                assets.extend(sql_assets)
+
+            # Fetch PowerBI assets
+            if powerbi_types and len(assets) < max_results:
+                remaining = max_results - len(assets)
+                powerbi_assets = await self._fetch_powerbi_assets(powerbi_types, remaining, min_popularity)
+                assets.extend(powerbi_assets)
+
+            logger.info(f"Fetched {len(assets)} assets from Atlan")
+            return assets[:max_results]
+
+        except Exception as e:
+            logger.error(f"Error fetching assets: {e}")
+            return assets
+
+    async def _fetch_sql_assets(
+        self,
+        asset_types: List[str],
+        max_results: int,
+        min_popularity: float
+    ) -> List[AssetMetadata]:
+        """Fetch SQL assets from Atlan."""
+        assets = []
+
+        try:
             search = (
                 FluentSearch()
                 .where(FluentSearch.SUPER_TYPE_NAMES.eq("SQL"))
@@ -101,11 +133,46 @@ class AtlanMetadataClient:
                 if metadata:
                     assets.append(metadata)
 
-            logger.info(f"Fetched {len(assets)} assets from Atlan")
+            logger.info(f"Fetched {len(assets)} SQL assets")
             return assets
 
         except Exception as e:
-            logger.error(f"Error fetching assets: {e}")
+            logger.error(f"Error fetching SQL assets: {e}")
+            return assets
+
+    async def _fetch_powerbi_assets(
+        self,
+        asset_types: List[str],
+        max_results: int,
+        min_popularity: float
+    ) -> List[AssetMetadata]:
+        """Fetch PowerBI assets from Atlan."""
+        assets = []
+
+        try:
+            search = (
+                FluentSearch()
+                .where(FluentSearch.SUPER_TYPE_NAMES.eq("BI"))
+                .where(FluentSearch.TYPE_NAME.within(asset_types))
+                .where(FluentSearch.CONNECTOR_NAME.eq("powerbi"))
+                .page_size(min(max_results, 100))
+            )
+
+            results = self.client.asset.search(search)
+
+            for asset in results:
+                if len(assets) >= max_results:
+                    break
+
+                metadata = self._convert_to_asset_metadata(asset)
+                if metadata:
+                    assets.append(metadata)
+
+            logger.info(f"Fetched {len(assets)} PowerBI assets")
+            return assets
+
+        except Exception as e:
+            logger.error(f"Error fetching PowerBI assets: {e}")
             return assets
 
     def _convert_to_asset_metadata(self, asset: Asset) -> Optional[AssetMetadata]:
@@ -123,6 +190,18 @@ class AtlanMetadataClient:
                         is_nullable=getattr(col, "is_nullable", True),
                     ))
 
+            # Extract PowerBI-specific attributes
+            dax_expression = None
+            is_external_measure = None
+            dataset_qualified_name = None
+            workspace_qualified_name = None
+
+            if asset.type_name == "PowerBIMeasure":
+                dax_expression = getattr(asset, "power_bi_measure_expression", None)
+                is_external_measure = getattr(asset, "power_bi_is_external_measure", None)
+                dataset_qualified_name = getattr(asset, "dataset_qualified_name", None)
+                workspace_qualified_name = getattr(asset, "workspace_qualified_name", None)
+
             return AssetMetadata(
                 qualified_name=asset.qualified_name,
                 name=asset.name,
@@ -136,6 +215,10 @@ class AtlanMetadataClient:
                 owner=getattr(asset, "owner_users", [None])[0] if getattr(asset, "owner_users", None) else None,
                 database_name=getattr(asset, "database_name", None),
                 schema_name=getattr(asset, "schema_name", None),
+                dax_expression=dax_expression,
+                is_external_measure=is_external_measure,
+                dataset_qualified_name=dataset_qualified_name,
+                workspace_qualified_name=workspace_qualified_name,
             )
         except Exception as e:
             logger.warning(f"Error converting asset {getattr(asset, 'name', 'unknown')}: {e}")

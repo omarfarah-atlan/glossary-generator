@@ -12,7 +12,8 @@ class PromptTemplates:
         asset_type: str,
         description: Optional[str] = None,
         columns: Optional[List[dict]] = None,
-        usage_stats: Optional[dict] = None
+        usage_stats: Optional[dict] = None,
+        dax_expression: Optional[str] = None
     ) -> str:
         """Generate a prompt for creating a glossary term definition."""
 
@@ -25,6 +26,11 @@ class PromptTemplates:
 
         if description:
             prompt += f"- **Existing Description**: {description}\n"
+
+        # Add DAX expression for PowerBI measures
+        if dax_expression and asset_type == "PowerBIMeasure":
+            prompt += f"\n## DAX Expression\n```dax\n{dax_expression}\n```\n"
+            prompt += "\nThis is a Power BI measure. Focus on what business metric this calculates based on the DAX formula.\n"
 
         if columns:
             prompt += "\n## Columns\n"
@@ -44,7 +50,34 @@ class PromptTemplates:
 - Popularity Score: {usage_stats.get('popularity_score', 'Unknown')}
 """
 
-        prompt += """
+        # Add measure-specific instructions
+        if asset_type == "PowerBIMeasure":
+            prompt += """
+## Instructions
+Based on the information above, generate a business glossary term definition for this Power BI measure. Focus on:
+1. What business metric or KPI this measure calculates
+2. How the DAX formula defines the calculation logic
+3. How business users would interpret and use this metric
+4. The business context and decision-making this metric supports
+
+Respond with a JSON object in this exact format:
+{
+    "name": "Business-friendly metric name (e.g., 'Total Revenue', 'Customer Lifetime Value')",
+    "definition": "A comprehensive 2-4 sentence definition explaining what business metric this calculates, how it's computed (in business terms), and its significance",
+    "short_description": "A one-sentence summary of the metric",
+    "examples": ["Example business use case 1", "Example business use case 2"],
+    "synonyms": ["Alternative metric name 1", "Alternative metric name 2"],
+    "confidence": "high|medium|low"
+}
+
+Set confidence based on:
+- "high": Clear DAX formula with descriptive measure name and/or description
+- "medium": DAX formula present but limited context
+- "low": Complex DAX formula with limited information to infer business meaning
+
+Respond ONLY with the JSON object, no additional text."""
+        else:
+            prompt += """
 ## Instructions
 Based on the information above, generate a business glossary term definition. Focus on:
 1. What this data represents in business terms

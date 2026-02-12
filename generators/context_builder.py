@@ -42,6 +42,16 @@ class ContextBuilder:
                 for col in asset.columns[:self.max_columns]
             ]
 
+        # Add DAX expression for PowerBI measures
+        if asset.dax_expression:
+            context["dax_expression"] = asset.dax_expression
+
+        # Add PowerBI metadata
+        if asset.dataset_qualified_name:
+            context["dataset"] = asset.dataset_qualified_name
+        if asset.workspace_qualified_name:
+            context["workspace"] = asset.workspace_qualified_name
+
         # Add usage statistics
         if usage:
             context["usage_stats"] = {

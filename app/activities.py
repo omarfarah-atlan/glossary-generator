@@ -89,7 +89,7 @@ class GlossaryActivities:
             config = WorkflowConfig(**config_dict)
 
             assets = await self.atlan_client.fetch_assets_with_descriptions(
-                asset_types=config.asset_types,
+                asset_types=config.get_all_asset_types(),
                 max_results=config.max_assets,
                 min_popularity=config.min_popularity_score,
             )

@@ -65,6 +65,12 @@ class AssetMetadata(BaseModel):
     database_name: Optional[str] = None
     schema_name: Optional[str] = None
 
+    # PowerBI-specific fields
+    dax_expression: Optional[str] = None
+    is_external_measure: Optional[bool] = None
+    dataset_qualified_name: Optional[str] = None
+    workspace_qualified_name: Optional[str] = None
+
 
 class ColumnMetadata(BaseModel):
     """Metadata for a column within a table."""
@@ -91,11 +97,20 @@ class WorkflowConfig(BaseModel):
     """Configuration for the glossary generation workflow."""
 
     target_glossary_qn: str
-    asset_types: List[str] = Field(default=["Table", "View", "MaterializedView"])
+    asset_types: List[str] = Field(default=["Table", "View", "MaterializedView"])  # Legacy field for backward compatibility
+    sql_asset_types: List[str] = Field(default=["Table", "View", "MaterializedView"])
+    powerbi_asset_types: List[str] = Field(default=[])  # Empty = disabled
     max_assets: int = 100
     min_popularity_score: float = 0.0
     batch_size: int = 10
     include_columns: bool = True
+
+    def get_all_asset_types(self) -> List[str]:
+        """Get combined list of all asset types to fetch."""
+        # Support legacy asset_types field
+        if self.asset_types != ["Table", "View", "MaterializedView"]:
+            return self.asset_types
+        return self.sql_asset_types + self.powerbi_asset_types
 
 
 class BatchResult(BaseModel):
