@@ -490,22 +490,22 @@ async def update_settings(request: SettingsUpdateRequest):
 
 @router.post("/api/v1/settings/test-anthropic")
 async def test_anthropic_connection():
-    """Test the Anthropic API connection via Atlan's LLM proxy."""
+    """Test the LLM API connection via Atlan's LiteLLM proxy."""
     try:
         settings = load_settings()
 
         if not settings.anthropic_api_key:
-            return {"success": False, "error": "Anthropic API key not configured"}
+            return {"success": False, "error": "LLM API key not configured"}
 
-        from anthropic import Anthropic
+        from openai import OpenAI
 
-        # Use Atlan's LLM proxy as the base URL
-        client = Anthropic(
+        # Use OpenAI-compatible client with LiteLLM proxy
+        client = OpenAI(
             api_key=settings.anthropic_api_key,
             base_url=settings.llm_proxy_url
         )
         # Make a minimal API call to test
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=settings.claude_model,
             max_tokens=10,
             messages=[{"role": "user", "content": "Hi"}]
@@ -514,7 +514,7 @@ async def test_anthropic_connection():
         return {"success": True, "model": settings.claude_model, "proxy": settings.llm_proxy_url}
 
     except Exception as e:
-        logger.error(f"Anthropic test failed: {e}")
+        logger.error(f"LLM proxy test failed: {e}")
         return {"success": False, "error": str(e)}
 
 
