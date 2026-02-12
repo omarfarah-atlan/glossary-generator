@@ -3,6 +3,7 @@
 let terms = [];
 let selectedTermIds = new Set();
 let currentTerm = null;
+let atlanBaseUrl = '';
 
 // DOM elements
 const termsList = document.getElementById('termsList');
@@ -16,7 +17,14 @@ const termModal = document.getElementById('termModal');
 const closeModal = document.getElementById('closeModal');
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Load Atlan base URL for asset links
+    try {
+        const settingsResp = await fetch('/api/v1/settings');
+        const settings = await settingsResp.json();
+        atlanBaseUrl = (settings.atlan_base_url || '').replace(/\/+$/, '');
+    } catch (e) { /* ignore */ }
+
     loadStats();
     loadTerms();
 
@@ -142,7 +150,6 @@ function openTermModal(termId) {
     document.getElementById('modalTermType').textContent = formatTermType(currentTerm.term_type);
     document.getElementById('modalTermType').className = `badge badge-${currentTerm.term_type || 'business_term'}`;
     document.getElementById('modalDefinition').value = currentTerm.edited_definition || currentTerm.definition;
-    document.getElementById('modalShortDesc').value = currentTerm.short_description || '';
     document.getElementById('modalNotes').value = currentTerm.reviewer_notes || '';
 
     // Examples
@@ -157,11 +164,73 @@ function openTermModal(termId) {
         .map(syn => `<span class="tag">${escapeHtml(syn)}</span>`)
         .join('') || '<span class="tag">None</span>';
 
-    // Sources
-    const sourcesList = document.getElementById('modalSources');
-    sourcesList.innerHTML = (currentTerm.source_assets || [])
-        .map(src => `<li>${escapeHtml(src)}</li>`)
-        .join('') || '<li>No sources</li>';
+    // Sources — linked to Atlan if base URL is available
+    const sourcesDiv = document.getElementById('modalSources');
+    const sourceAssets = currentTerm.source_assets || [];
+    if (sourceAssets.length === 0) {
+        sourcesDiv.innerHTML = '<span class="text-muted">No sources</span>';
+    } else {
+        sourcesDiv.innerHTML = sourceAssets.map(qn => {
+            const shortName = currentTerm.source_asset_name || qn.split('/').pop();
+            const assetType = currentTerm.source_asset_type || '';
+            const typeLabel = assetType ? `<span class="source-asset-type">${escapeHtml(assetType)}</span>` : '';
+            if (atlanBaseUrl) {
+                const url = `${atlanBaseUrl}/assets/${encodeURIComponent(qn)}`;
+                return `<a href="${url}" target="_blank" rel="noopener" class="source-asset-link">${typeLabel}<span class="source-asset-name">${escapeHtml(shortName)}</span><svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" class="external-icon"><path d="M9 3L5 7m4-4H6.5M9 3v2.5M4 3H3a1 1 0 00-1 1v5a1 1 0 001 1h5a1 1 0 001-1V8"/></svg></a>`;
+            }
+            return `<span class="source-asset-link">${typeLabel}<span class="source-asset-name">${escapeHtml(shortName)}</span></span>`;
+        }).join('');
+    }
+
+    // Generation context ("Why this term?")
+    const contextEl = document.getElementById('generationContext');
+    const reasoning = currentTerm.generation_reasoning;
+    const signals = currentTerm.metadata_signals || [];
+    const hasContext = reasoning || signals.length > 0 || currentTerm.source_asset_name;
+
+    if (hasContext) {
+        contextEl.style.display = 'block';
+        // Auto-expand if there's reasoning to show
+        contextEl.classList.add('expanded');
+
+        // Reasoning from LLM
+        const reasoningEl = document.getElementById('modalReasoning');
+        reasoningEl.innerHTML = reasoning
+            ? `<p>${escapeHtml(reasoning)}</p>`
+            : '';
+
+        // Source info
+        const sourceInfo = document.getElementById('modalSourceInfo');
+        const parts = [];
+        if (currentTerm.source_asset_name) {
+            let label = `<strong>${escapeHtml(currentTerm.source_asset_name)}</strong>`;
+            if (currentTerm.source_asset_type) label += ` (${escapeHtml(currentTerm.source_asset_type)})`;
+            parts.push(`Source: ${label}`);
+        }
+        if (currentTerm.source_database || currentTerm.source_schema) {
+            const loc = [currentTerm.source_database, currentTerm.source_schema].filter(Boolean).join('.');
+            parts.push(`Location: <code>${escapeHtml(loc)}</code>`);
+        }
+        sourceInfo.innerHTML = parts.join(' &bull; ');
+
+        // Metadata signals
+        const signalsEl = document.getElementById('modalSignals');
+        signalsEl.innerHTML = signals.length > 0
+            ? 'Signals: ' + signals.map(s => `<span class="signal-tag">${escapeHtml(s)}</span>`).join('')
+            : '';
+
+        // Usage info
+        const usageEl = document.getElementById('modalUsageInfo');
+        const usageParts = [];
+        if (currentTerm.query_frequency > 0) usageParts.push(`${currentTerm.query_frequency} queries`);
+        if (currentTerm.user_access_count > 0) usageParts.push(`${currentTerm.user_access_count} users`);
+        if (currentTerm.popularity_score > 0) usageParts.push(`Popularity: ${currentTerm.popularity_score.toFixed(1)}`);
+        usageEl.innerHTML = usageParts.length > 0
+            ? 'Usage: ' + usageParts.join(' &bull; ')
+            : '';
+    } else {
+        contextEl.style.display = 'none';
+    }
 
     // Update button states based on status
     const approveBtn = document.getElementById('modalApproveBtn');

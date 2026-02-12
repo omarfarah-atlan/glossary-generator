@@ -868,6 +868,162 @@ header h1 {
     background: linear-gradient(90deg, #f0fdf4 0%, var(--atlan-bg-card) 8%);
 }
 
+/* Source asset links */
+.source-assets-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.source-asset-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--atlan-bg);
+    border: 1px solid var(--atlan-border);
+    border-radius: var(--atlan-radius-sm);
+    font-size: 0.85rem;
+    color: var(--atlan-text);
+    text-decoration: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+a.source-asset-link:hover {
+    border-color: var(--atlan-primary);
+    background: #eef2ff;
+    color: var(--atlan-primary);
+}
+
+.source-asset-type {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--atlan-text-secondary);
+    background: var(--atlan-bg-card);
+    padding: 1px 6px;
+    border-radius: 3px;
+}
+
+.source-asset-name {
+    font-weight: 500;
+}
+
+.external-icon {
+    opacity: 0.4;
+    flex-shrink: 0;
+}
+
+a.source-asset-link:hover .external-icon {
+    opacity: 0.8;
+}
+
+.field-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.78rem;
+    color: var(--atlan-text-secondary);
+}
+
+.text-muted {
+    color: var(--atlan-text-secondary);
+    font-size: 0.88rem;
+}
+
+/* Generation context ("Why this term?") */
+.generation-context {
+    margin: 16px 0;
+    border: 1px solid var(--atlan-border-light);
+    border-radius: var(--atlan-radius-sm);
+    overflow: hidden;
+}
+
+.generation-context-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--atlan-bg);
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--atlan-text-secondary);
+    user-select: none;
+}
+
+.generation-context-header:hover {
+    color: var(--atlan-text);
+    background: #f0f1f5;
+}
+
+.context-chevron {
+    transition: transform 0.2s ease;
+}
+
+.generation-context.expanded .context-chevron {
+    transform: rotate(90deg);
+}
+
+.generation-context-body {
+    display: none;
+    padding: 14px;
+    font-size: 0.88rem;
+    border-top: 1px solid var(--atlan-border-light);
+}
+
+.generation-context.expanded .generation-context-body {
+    display: block;
+}
+
+.context-reasoning {
+    margin-bottom: 10px;
+}
+
+.context-reasoning p {
+    margin: 0;
+    color: var(--atlan-text);
+    line-height: 1.6;
+}
+
+.context-details {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.context-row {
+    color: var(--atlan-text-secondary);
+    font-size: 0.84rem;
+    line-height: 1.5;
+}
+
+.context-row:empty {
+    display: none;
+}
+
+.context-row strong {
+    color: var(--atlan-text);
+}
+
+.context-row code {
+    background: var(--atlan-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+}
+
+.signal-tag {
+    display: inline-block;
+    background: #eef2ff;
+    color: #4338ca;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    margin: 0 3px 2px 0;
+}
+
 /* Guide page */
 .guide-card {
     padding: 32px 36px;

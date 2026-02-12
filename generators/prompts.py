@@ -123,7 +123,8 @@ Respond with a JSON object in this exact format:
     "short_description": "One-sentence summary of the business concept",
     "examples": ["Example use case 1", "Example use case 2"],
     "synonyms": ["Alternative term 1", "Alternative term 2"],
-    "confidence": "high|medium|low"
+    "confidence": "high|medium|low",
+    "reasoning": "1-2 sentences explaining why you chose this name, type, and confidence level. Mention which metadata signals (description, columns, SQL, usage stats, naming patterns) most influenced your decisions."
 }}
 
 Set confidence based on:

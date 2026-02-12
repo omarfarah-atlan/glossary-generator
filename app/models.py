@@ -45,6 +45,13 @@ class GlossaryTermDraft(BaseModel):
     target_glossary_qn: str
     query_frequency: int = 0
     user_access_count: int = 0
+    popularity_score: float = 0.0
+    source_asset_name: Optional[str] = None
+    source_asset_type: Optional[str] = None
+    source_database: Optional[str] = None
+    source_schema: Optional[str] = None
+    generation_reasoning: Optional[str] = None
+    metadata_signals: List[str] = Field(default_factory=list)
     edited_definition: Optional[str] = None
     reviewer_notes: Optional[str] = None
     created_at: Optional[datetime] = None

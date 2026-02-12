@@ -64,6 +64,27 @@ class TermGenerator:
                 except ValueError:
                     resolved_type = TermType.BUSINESS_TERM
 
+                # Build metadata signals list describing what data was available
+                signals = []
+                if context.get("description"):
+                    signals.append("Has description")
+                if context.get("columns"):
+                    signals.append(f"{len(context['columns'])} columns")
+                if context.get("sql_definition"):
+                    signals.append("SQL definition")
+                if context.get("dbt_context"):
+                    signals.append("dbt model")
+                if context.get("usage_stats"):
+                    stats = context["usage_stats"]
+                    if stats.get("query_frequency", 0) > 0:
+                        signals.append(f"{stats['query_frequency']} queries")
+                    if stats.get("unique_users", 0) > 0:
+                        signals.append(f"{stats['unique_users']} users")
+                if asset.tags:
+                    signals.append(f"{len(asset.tags)} tags")
+
+                pop_score = usage.popularity_score if usage else asset.popularity_score
+
                 # Create draft from result
                 draft = GlossaryTermDraft(
                     id=str(uuid4()),
@@ -79,6 +100,13 @@ class TermGenerator:
                     target_glossary_qn=target_glossary_qn,
                     query_frequency=usage.query_frequency if usage else asset.query_count,
                     user_access_count=usage.unique_users if usage else asset.user_count,
+                    popularity_score=pop_score,
+                    source_asset_name=asset.name,
+                    source_asset_type=asset.type_name,
+                    source_database=asset.database_name,
+                    source_schema=asset.schema_name,
+                    generation_reasoning=result.get("reasoning"),
+                    metadata_signals=signals,
                 )
 
                 logger.info(f"Generated term: {draft.name} (type: {resolved_type.value}, confidence: {draft.confidence})")

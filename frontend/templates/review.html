@@ -163,13 +163,9 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Definition</label>
+                        <label>Description</label>
                         <textarea id="modalDefinition" rows="4"></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Short Description</label>
-                        <input type="text" id="modalShortDesc" readonly>
+                        <small class="field-hint">This text is published as the term description in Atlan.</small>
                     </div>
 
                     <div class="form-group">
@@ -182,9 +178,27 @@
                         <div id="modalSynonyms" class="tags"></div>
                     </div>
 
+                    <!-- Why this term? -->
+                    <div class="generation-context" id="generationContext">
+                        <div class="generation-context-header" onclick="document.getElementById('generationContext').classList.toggle('expanded')">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="context-chevron">
+                                <path d="M5 3l4 4-4 4"/>
+                            </svg>
+                            <span>Why this term?</span>
+                        </div>
+                        <div class="generation-context-body">
+                            <div class="context-reasoning" id="modalReasoning"></div>
+                            <div class="context-details">
+                                <div class="context-row" id="modalSourceInfo"></div>
+                                <div class="context-row" id="modalSignals"></div>
+                                <div class="context-row" id="modalUsageInfo"></div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label>Source Assets</label>
-                        <ul id="modalSources" class="sources-list"></ul>
+                        <div id="modalSources" class="source-assets-list"></div>
                     </div>
 
                     <div class="form-group">
@@ -217,6 +231,6 @@
         </footer>
     </div>
 
-    <script src="/static/review.js?v=6"></script>
+    <script src="/static/review.js?v=8"></script>
 </body>
 </html>
