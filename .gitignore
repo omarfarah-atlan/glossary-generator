@@ -36,6 +36,7 @@ ENV/
 # Local development
 local/dapr/*.db
 local/secrets.json
+local/settings.json
 
 # Test coverage
 .coverage

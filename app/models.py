@@ -126,6 +126,7 @@ class AppSettings(BaseModel):
     anthropic_api_key: Optional[str] = None
     atlan_api_key: Optional[str] = None
     atlan_base_url: Optional[str] = None
+    llm_proxy_url: str = "https://llmproxy.atlan.dev"
     claude_model: str = "claude-sonnet-4-20250514"
     default_glossary_qn: Optional[str] = None
 
@@ -147,6 +148,7 @@ class AppSettings(BaseModel):
             "anthropic_api_key": self.mask_key(self.anthropic_api_key),
             "atlan_api_key": self.mask_key(self.atlan_api_key),
             "atlan_base_url": self.atlan_base_url,
+            "llm_proxy_url": self.llm_proxy_url,
             "claude_model": self.claude_model,
             "default_glossary_qn": self.default_glossary_qn,
             "is_configured": self.is_configured(),

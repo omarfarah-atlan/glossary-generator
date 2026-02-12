@@ -3,17 +3,46 @@
 import json
 import logging
 from typing import List, Optional
+from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from dapr.clients import DaprClient
 
 from app.models import GlossaryTermDraft, TermStatus, AppSettings
+from app.settings_store import load_settings, save_settings
 
 logger = logging.getLogger(__name__)
 
 DAPR_STORE_NAME = "statestore"
+
+# Dapr availability tracking for fast-fail
+_dapr_available: Optional[bool] = None
+_dapr_check_timestamp: Optional[datetime] = None
+_DAPR_RETRY_INTERVAL = timedelta(minutes=5)
+
+
+def _get_dapr_client():
+    """Get DaprClient with fast-fail if known unavailable."""
+    global _dapr_available, _dapr_check_timestamp
+
+    # Fast-fail if known unavailable and within retry interval
+    if _dapr_available is False:
+        if _dapr_check_timestamp and datetime.now() - _dapr_check_timestamp < _DAPR_RETRY_INTERVAL:
+            return None
+
+    try:
+        from dapr.clients import DaprClient
+        return DaprClient()
+    except Exception:
+        return None
+
+
+def _mark_dapr_available(available: bool):
+    """Mark Dapr availability status."""
+    global _dapr_available, _dapr_check_timestamp
+    _dapr_available = available
+    _dapr_check_timestamp = datetime.now()
 
 router = APIRouter()
 templates = Jinja2Templates(directory="frontend/templates")
@@ -45,17 +74,21 @@ class SettingsUpdateRequest(BaseModel):
     anthropic_api_key: Optional[str] = None
     atlan_api_key: Optional[str] = None
     atlan_base_url: Optional[str] = None
+    llm_proxy_url: Optional[str] = None
     claude_model: Optional[str] = None
     default_glossary_qn: Optional[str] = None
-
-
-SETTINGS_KEY = "app_settings"
 
 
 def get_all_term_ids() -> List[str]:
     """Get all term IDs from state store by scanning batch indices."""
     term_ids = []
+
+    client = _get_dapr_client()
+    if client is None:
+        return term_ids
+
     try:
+        from dapr.clients import DaprClient
         with DaprClient() as client:
             # Scan for batch indices (in production, use proper querying)
             # For now, we'll try common patterns
@@ -68,20 +101,29 @@ def get_all_term_ids() -> List[str]:
                         term_ids.extend(batch.get("term_ids", []))
                 except Exception:
                     continue
+        _mark_dapr_available(True)
     except Exception as e:
-        logger.error(f"Error scanning batches: {e}")
+        _mark_dapr_available(False)
+        logger.debug(f"Dapr unavailable for batch scan: {type(e).__name__}")
     return term_ids
 
 
 def get_terms_by_status(status: Optional[TermStatus] = None) -> List[GlossaryTermDraft]:
     """Get all terms, optionally filtered by status."""
     terms = []
-    try:
-        with DaprClient() as client:
-            # Get terms from known IDs (this is a simplified approach)
-            # In production, maintain a proper index
-            term_ids = get_all_term_ids()
 
+    # Get term IDs first (uses fast-fail internally)
+    term_ids = get_all_term_ids()
+    if not term_ids:
+        return terms
+
+    client = _get_dapr_client()
+    if client is None:
+        return terms
+
+    try:
+        from dapr.clients import DaprClient
+        with DaprClient() as client:
             for term_id in term_ids:
                 try:
                     key = f"glossary_term_{term_id}"
@@ -94,9 +136,10 @@ def get_terms_by_status(status: Optional[TermStatus] = None) -> List[GlossaryTer
                 except Exception as e:
                     logger.warning(f"Error loading term {term_id}: {e}")
                     continue
-
+        _mark_dapr_available(True)
     except Exception as e:
-        logger.error(f"Error connecting to Dapr: {e}")
+        _mark_dapr_available(False)
+        logger.debug(f"Dapr unavailable for term loading: {type(e).__name__}")
 
     return terms
 
@@ -147,7 +190,11 @@ async def list_terms(
 @router.get("/api/v1/terms/{term_id}")
 async def get_term(term_id: str):
     """Get a single term by ID."""
+    if _get_dapr_client() is None:
+        raise HTTPException(status_code=503, detail="State store unavailable")
+
     try:
+        from dapr.clients import DaprClient
         with DaprClient() as client:
             key = f"glossary_term_{term_id}"
             state = client.get_state(store_name=DAPR_STORE_NAME, key=key)
@@ -155,20 +202,26 @@ async def get_term(term_id: str):
             if not state.data:
                 raise HTTPException(status_code=404, detail="Term not found")
 
+            _mark_dapr_available(True)
             term_data = json.loads(state.data)
             return term_data
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting term {term_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _mark_dapr_available(False)
+        logger.debug(f"Dapr error getting term: {type(e).__name__}")
+        raise HTTPException(status_code=503, detail="State store unavailable")
 
 
 @router.post("/api/v1/terms/{term_id}/approve")
 async def approve_term(term_id: str, request: ApproveRequest):
     """Approve a term with optional edits."""
+    if _get_dapr_client() is None:
+        raise HTTPException(status_code=503, detail="State store unavailable")
+
     try:
+        from dapr.clients import DaprClient
         with DaprClient() as client:
             key = f"glossary_term_{term_id}"
             state = client.get_state(store_name=DAPR_STORE_NAME, key=key)
@@ -193,19 +246,25 @@ async def approve_term(term_id: str, request: ApproveRequest):
                 value=json.dumps(term.model_dump(mode="json")),
             )
 
+            _mark_dapr_available(True)
             return {"status": "approved", "term_id": term_id}
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error approving term {term_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _mark_dapr_available(False)
+        logger.debug(f"Dapr error approving term: {type(e).__name__}")
+        raise HTTPException(status_code=503, detail="State store unavailable")
 
 
 @router.post("/api/v1/terms/{term_id}/reject")
 async def reject_term(term_id: str, request: RejectRequest):
     """Reject a term with a reason."""
+    if _get_dapr_client() is None:
+        raise HTTPException(status_code=503, detail="State store unavailable")
+
     try:
+        from dapr.clients import DaprClient
         with DaprClient() as client:
             key = f"glossary_term_{term_id}"
             state = client.get_state(store_name=DAPR_STORE_NAME, key=key)
@@ -227,13 +286,15 @@ async def reject_term(term_id: str, request: RejectRequest):
                 value=json.dumps(term.model_dump(mode="json")),
             )
 
+            _mark_dapr_available(True)
             return {"status": "rejected", "term_id": term_id}
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error rejecting term {term_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _mark_dapr_available(False)
+        logger.debug(f"Dapr error rejecting term: {type(e).__name__}")
+        raise HTTPException(status_code=503, detail="State store unavailable")
 
 
 @router.post("/api/v1/terms/bulk-approve")
@@ -241,7 +302,11 @@ async def bulk_approve(request: BulkApproveRequest):
     """Bulk approve multiple terms."""
     results = {"approved": 0, "failed": 0, "errors": []}
 
+    if _get_dapr_client() is None:
+        raise HTTPException(status_code=503, detail="State store unavailable")
+
     try:
+        from dapr.clients import DaprClient
         with DaprClient() as client:
             for term_id in request.term_ids:
                 try:
@@ -268,9 +333,12 @@ async def bulk_approve(request: BulkApproveRequest):
                     results["failed"] += 1
                     results["errors"].append(f"Error on {term_id}: {str(e)}")
 
+            _mark_dapr_available(True)
+
     except Exception as e:
-        logger.error(f"Bulk approve error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _mark_dapr_available(False)
+        logger.debug(f"Dapr error in bulk approve: {type(e).__name__}")
+        raise HTTPException(status_code=503, detail="State store unavailable")
 
     return results
 
@@ -281,9 +349,14 @@ async def publish_terms(request: PublishRequest):
     from clients.atlan_client import AtlanMetadataClient
 
     results = {"published": 0, "failed": 0, "errors": []}
+
+    if _get_dapr_client() is None:
+        raise HTTPException(status_code=503, detail="State store unavailable")
+
     atlan_client = AtlanMetadataClient()
 
     try:
+        from dapr.clients import DaprClient
         with DaprClient() as client:
             for term_id in request.term_ids:
                 try:
@@ -324,9 +397,12 @@ async def publish_terms(request: PublishRequest):
                     results["failed"] += 1
                     results["errors"].append(f"Error on {term_id}: {str(e)}")
 
+            _mark_dapr_available(True)
+
     except Exception as e:
-        logger.error(f"Publish error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _mark_dapr_available(False)
+        logger.debug(f"Dapr error in publish: {type(e).__name__}")
+        raise HTTPException(status_code=503, detail="State store unavailable")
 
     return results
 
@@ -365,65 +441,48 @@ async def settings_page(request: Request):
 async def get_settings():
     """Get current application settings (with masked keys)."""
     try:
-        with DaprClient() as client:
-            state = client.get_state(store_name=DAPR_STORE_NAME, key=SETTINGS_KEY)
-
-            if state.data:
-                settings_data = json.loads(state.data)
-                settings = AppSettings(**settings_data)
-            else:
-                settings = AppSettings()
-
-            return settings.to_display()
-
+        settings = load_settings()
+        return settings.to_display()
     except Exception as e:
         logger.error(f"Error getting settings: {e}")
-        # Return empty settings if Dapr is not available
         return AppSettings().to_display()
 
 
 @router.post("/api/v1/settings")
 async def update_settings(request: SettingsUpdateRequest):
-    """Update application settings."""
+    """Update application settings (persisted to file and Dapr)."""
     try:
-        with DaprClient() as client:
-            # Load existing settings
-            state = client.get_state(store_name=DAPR_STORE_NAME, key=SETTINGS_KEY)
+        # Load existing settings
+        existing = load_settings()
 
-            if state.data:
-                existing = AppSettings(**json.loads(state.data))
-            else:
-                existing = AppSettings()
+        # Update only provided fields (don't overwrite with None)
+        update_data = request.model_dump(exclude_none=True)
 
-            # Update only provided fields (don't overwrite with None)
-            update_data = request.model_dump(exclude_none=True)
+        # Special handling: if key is empty string, treat as clearing
+        for key in ["anthropic_api_key", "atlan_api_key"]:
+            if key in update_data and update_data[key] == "":
+                update_data[key] = None
 
-            # Special handling: if key is empty string, treat as clearing
-            for key in ["anthropic_api_key", "atlan_api_key"]:
-                if key in update_data and update_data[key] == "":
-                    update_data[key] = None
+        # Don't update keys if they look like masked values
+        for key in ["anthropic_api_key", "atlan_api_key"]:
+            if key in update_data:
+                val = update_data[key]
+                if val and ("..." in val or val == "****"):
+                    del update_data[key]
 
-            # Don't update keys if they look like masked values
-            for key in ["anthropic_api_key", "atlan_api_key"]:
-                if key in update_data:
-                    val = update_data[key]
-                    if val and ("..." in val or val == "****"):
-                        del update_data[key]
+        updated = existing.model_copy(update=update_data)
 
-            updated = existing.model_copy(update=update_data)
-
-            # Save updated settings
-            client.save_state(
-                store_name=DAPR_STORE_NAME,
-                key=SETTINGS_KEY,
-                value=json.dumps(updated.model_dump()),
-            )
-
+        # Save to both file and Dapr for persistence
+        if save_settings(updated):
             return {
                 "status": "saved",
                 "settings": updated.to_display(),
             }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save settings")
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error saving settings: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -431,16 +490,20 @@ async def update_settings(request: SettingsUpdateRequest):
 
 @router.post("/api/v1/settings/test-anthropic")
 async def test_anthropic_connection():
-    """Test the Anthropic API connection."""
+    """Test the Anthropic API connection via Atlan's LLM proxy."""
     try:
-        settings = await _get_settings()
+        settings = load_settings()
 
         if not settings.anthropic_api_key:
             return {"success": False, "error": "Anthropic API key not configured"}
 
         from anthropic import Anthropic
 
-        client = Anthropic(api_key=settings.anthropic_api_key)
+        # Use Atlan's LLM proxy as the base URL
+        client = Anthropic(
+            api_key=settings.anthropic_api_key,
+            base_url=settings.llm_proxy_url
+        )
         # Make a minimal API call to test
         response = client.messages.create(
             model=settings.claude_model,
@@ -448,7 +511,7 @@ async def test_anthropic_connection():
             messages=[{"role": "user", "content": "Hi"}]
         )
 
-        return {"success": True, "model": settings.claude_model}
+        return {"success": True, "model": settings.claude_model, "proxy": settings.llm_proxy_url}
 
     except Exception as e:
         logger.error(f"Anthropic test failed: {e}")
@@ -459,7 +522,7 @@ async def test_anthropic_connection():
 async def test_atlan_connection():
     """Test the Atlan API connection."""
     try:
-        settings = await _get_settings()
+        settings = load_settings()
 
         if not settings.atlan_base_url:
             return {"success": False, "error": "Atlan base URL not configured"}
@@ -484,27 +547,6 @@ async def test_atlan_connection():
         return {"success": False, "error": str(e)}
 
 
-async def _get_settings() -> AppSettings:
-    """Helper to get settings from state store."""
-    try:
-        with DaprClient() as client:
-            state = client.get_state(store_name=DAPR_STORE_NAME, key=SETTINGS_KEY)
-            if state.data:
-                return AppSettings(**json.loads(state.data))
-    except Exception as e:
-        logger.warning(f"Could not load settings from Dapr: {e}")
-
-    return AppSettings()
-
-
 def get_settings_sync() -> AppSettings:
-    """Synchronous helper to get settings from state store."""
-    try:
-        with DaprClient() as client:
-            state = client.get_state(store_name=DAPR_STORE_NAME, key=SETTINGS_KEY)
-            if state.data:
-                return AppSettings(**json.loads(state.data))
-    except Exception as e:
-        logger.warning(f"Could not load settings from Dapr: {e}")
-
-    return AppSettings()
+    """Synchronous helper to get settings (for backward compatibility)."""
+    return load_settings()

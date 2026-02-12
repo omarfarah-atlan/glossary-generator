@@ -60,6 +60,13 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="llmProxyUrl">LLM Proxy URL</label>
+                        <input type="url" id="llmProxyUrl" name="llm_proxy_url"
+                               placeholder="https://llmproxy.atlan.dev" value="https://llmproxy.atlan.dev">
+                        <small>Atlan's AI wrapper proxy URL. Uses <a href="https://docs.litellm.ai/docs/proxy/ai_hub" target="_blank">LiteLLM proxy</a> format.</small>
+                    </div>
+
+                    <div class="form-group">
                         <label for="claudeModel">Claude Model</label>
                         <select id="claudeModel" name="claude_model">
                             <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Recommended)</option>
@@ -240,6 +247,9 @@
                 if (settings.atlan_base_url) {
                     document.getElementById('atlanUrl').value = settings.atlan_base_url;
                 }
+                if (settings.llm_proxy_url) {
+                    document.getElementById('llmProxyUrl').value = settings.llm_proxy_url;
+                }
                 if (settings.claude_model) {
                     document.getElementById('claudeModel').value = settings.claude_model;
                 }
@@ -264,6 +274,7 @@
 
             const settings = {
                 claude_model: document.getElementById('claudeModel').value,
+                llm_proxy_url: document.getElementById('llmProxyUrl').value || null,
                 atlan_base_url: document.getElementById('atlanUrl').value || null,
                 default_glossary_qn: document.getElementById('defaultGlossary').value || null,
             };

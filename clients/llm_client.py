@@ -9,33 +9,23 @@ from anthropic import AsyncAnthropic
 logger = logging.getLogger(__name__)
 
 
-def _get_settings_from_store() -> dict:
-    """Load settings from Dapr state store."""
-    try:
-        from dapr.clients import DaprClient
-        with DaprClient() as client:
-            state = client.get_state(store_name="statestore", key="app_settings")
-            if state.data:
-                return json.loads(state.data)
-    except Exception as e:
-        logger.debug(f"Could not load settings from Dapr: {e}")
-    return {}
-
-
 class ClaudeClient:
     """Client for interacting with Claude API to generate term definitions."""
 
-    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
-        # Try to load from state store first, then fall back to env vars
-        settings = _get_settings_from_store()
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, base_url: Optional[str] = None):
+        # Load settings from persistent store (file + Dapr)
+        from app.settings_store import load_settings
+        settings = load_settings()
 
-        self.api_key = api_key or settings.get("anthropic_api_key") or os.environ.get("ANTHROPIC_API_KEY")
-        self.model = model or settings.get("claude_model") or "claude-sonnet-4-20250514"
+        self.api_key = api_key or settings.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY")
+        self.model = model or settings.claude_model or "claude-sonnet-4-20250514"
+        self.base_url = base_url or settings.llm_proxy_url or os.environ.get("LLM_PROXY_URL") or "https://llmproxy.atlan.dev"
 
         if not self.api_key:
             raise ValueError("Anthropic API key not configured. Set it in Settings or ANTHROPIC_API_KEY environment variable.")
 
-        self._client = AsyncAnthropic(api_key=self.api_key)
+        logger.info(f"Initializing Claude client with proxy: {self.base_url}")
+        self._client = AsyncAnthropic(api_key=self.api_key, base_url=self.base_url)
 
     async def generate(self, prompt: str, max_tokens: int = 2000) -> str:
         """Generate text from a prompt using Claude."""

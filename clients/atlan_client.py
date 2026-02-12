@@ -1,7 +1,6 @@
 """Atlan client wrapper for metadata operations."""
 
 import os
-import json
 import logging
 from typing import List, Optional
 from pyatlan.client.atlan import AtlanClient
@@ -20,28 +19,16 @@ from app.models import AssetMetadata, ColumnMetadata, GlossaryTermDraft
 logger = logging.getLogger(__name__)
 
 
-def _get_settings_from_store() -> dict:
-    """Load settings from Dapr state store."""
-    try:
-        from dapr.clients import DaprClient
-        with DaprClient() as client:
-            state = client.get_state(store_name="statestore", key="app_settings")
-            if state.data:
-                return json.loads(state.data)
-    except Exception as e:
-        logger.debug(f"Could not load settings from Dapr: {e}")
-    return {}
-
-
 class AtlanMetadataClient:
     """Client for interacting with Atlan metadata catalog."""
 
     def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None):
-        # Try to load from state store first, then fall back to env vars
-        settings = _get_settings_from_store()
+        # Load settings from persistent store (file + Dapr)
+        from app.settings_store import load_settings
+        settings = load_settings()
 
-        self.base_url = base_url or settings.get("atlan_base_url") or os.environ.get("ATLAN_BASE_URL")
-        self.api_key = api_key or settings.get("atlan_api_key") or os.environ.get("ATLAN_API_KEY")
+        self.base_url = base_url or settings.atlan_base_url or os.environ.get("ATLAN_BASE_URL")
+        self.api_key = api_key or settings.atlan_api_key or os.environ.get("ATLAN_API_KEY")
         self._client: Optional[AtlanClient] = None
 
     @property
