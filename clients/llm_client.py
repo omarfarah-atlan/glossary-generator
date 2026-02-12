@@ -22,7 +22,7 @@ class ClaudeClient:
         settings = load_settings()
 
         self.api_key = api_key or settings.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY")
-        self.model = model or settings.claude_model or "claude-sonnet-4-20250514"
+        self.model = model or settings.claude_model or "claude-sonnet-4.5"
         self.base_url = base_url or settings.llm_proxy_url or os.environ.get("LLM_PROXY_URL") or "https://llmproxy.atlan.dev"
 
         if not self.api_key:

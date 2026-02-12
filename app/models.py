@@ -127,7 +127,7 @@ class AppSettings(BaseModel):
     atlan_api_key: Optional[str] = None
     atlan_base_url: Optional[str] = None
     llm_proxy_url: str = "https://llmproxy.atlan.dev"
-    claude_model: str = "claude-sonnet-4-20250514"
+    claude_model: str = "claude-sonnet-4.5"
     default_glossary_qn: Optional[str] = None
 
     def is_configured(self) -> bool:
