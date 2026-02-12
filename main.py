@@ -87,7 +87,8 @@ class GlossaryGeneratorApp:
                 status = await handle.query(GlossaryGenerationWorkflow.get_status)
                 progress = await handle.query(GlossaryGenerationWorkflow.get_progress)
                 message = await handle.query(GlossaryGenerationWorkflow.get_status_message)
-                return {"workflow_id": workflow_id, "status": status, "progress": progress, "message": message}
+                log_entries = await handle.query(GlossaryGenerationWorkflow.get_log)
+                return {"workflow_id": workflow_id, "status": status, "progress": progress, "message": message, "log_entries": log_entries}
             except Exception as e:
                 return {"workflow_id": workflow_id, "error": str(e)}
 

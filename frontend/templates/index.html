@@ -206,11 +206,42 @@
                             </div>
                         </div>
 
-                        <div class="status-message-box">
-                            <svg class="status-message-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 3v5h1V4H8zm0 7h1v1H8v-1z"/>
-                            </svg>
-                            <span id="workflowMessage" class="status-message">-</span>
+                        <!-- Step Timeline -->
+                        <div class="workflow-timeline" id="workflowTimeline">
+                            <div class="timeline-step" data-step="validating">
+                                <div class="timeline-connector"></div>
+                                <div class="timeline-circle">1</div>
+                                <div class="timeline-label">Validate</div>
+                            </div>
+                            <div class="timeline-step" data-step="fetching_metadata">
+                                <div class="timeline-connector"></div>
+                                <div class="timeline-circle">2</div>
+                                <div class="timeline-label">Fetch Metadata</div>
+                            </div>
+                            <div class="timeline-step" data-step="fetching_usage">
+                                <div class="timeline-connector"></div>
+                                <div class="timeline-circle">3</div>
+                                <div class="timeline-label">Usage Signals</div>
+                            </div>
+                            <div class="timeline-step" data-step="prioritizing">
+                                <div class="timeline-connector"></div>
+                                <div class="timeline-circle">4</div>
+                                <div class="timeline-label">Prioritize</div>
+                            </div>
+                            <div class="timeline-step" data-step="generating_definitions">
+                                <div class="timeline-connector"></div>
+                                <div class="timeline-circle">5</div>
+                                <div class="timeline-label">Generate Terms</div>
+                            </div>
+                            <div class="timeline-step" data-step="saving_drafts">
+                                <div class="timeline-connector"></div>
+                                <div class="timeline-circle">6</div>
+                                <div class="timeline-label">Save Drafts</div>
+                            </div>
+                            <div class="timeline-step" data-step="notifying">
+                                <div class="timeline-circle">7</div>
+                                <div class="timeline-label">Notify</div>
+                            </div>
                         </div>
 
                         <div class="progress-section">
@@ -223,6 +254,15 @@
                                     <div class="progress-shine"></div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Activity Log -->
+                        <div class="log-header">
+                            <div class="log-dot" id="logDot"></div>
+                            <h3>Activity Log</h3>
+                        </div>
+                        <div class="activity-log" id="activityLog">
+                            <div class="log-empty">Waiting for workflow to start...</div>
                         </div>
                     </div>
                 </div>
@@ -454,6 +494,11 @@
                 }
 
                 document.getElementById('workflowId').textContent = result.workflow_id;
+                // Reset log state for new workflow
+                lastLogCount = 0;
+                document.getElementById('activityLog').innerHTML = '<div class="log-empty">Waiting for workflow to start...</div>';
+                document.querySelectorAll('.timeline-step').forEach(s => s.classList.remove('completed', 'active', 'failed'));
+                document.getElementById('logDot').classList.remove('inactive');
                 statusSection.style.display = 'block';
                 statusSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 showToast('🚀 Workflow started successfully!', 'success');
@@ -470,6 +515,77 @@
             pollInterval = setInterval(() => updateStatus(workflowId), 2000);
         }
 
+        // Timeline step order for comparison
+        const STEP_ORDER = ['validating', 'fetching_metadata', 'fetching_usage', 'prioritizing', 'generating_definitions', 'saving_drafts', 'notifying', 'completed'];
+        let lastLogCount = 0;
+
+        function updateTimeline(currentStatus) {
+            const steps = document.querySelectorAll('.timeline-step');
+            const currentIdx = STEP_ORDER.indexOf(currentStatus);
+            const isFailed = currentStatus === 'failed';
+
+            steps.forEach((step) => {
+                const stepName = step.dataset.step;
+                const stepIdx = STEP_ORDER.indexOf(stepName);
+
+                step.classList.remove('completed', 'active', 'failed');
+
+                if (isFailed) {
+                    if (stepIdx < currentIdx) {
+                        step.classList.add('completed');
+                    } else if (stepIdx === currentIdx) {
+                        step.classList.add('failed');
+                    }
+                } else if (currentStatus === 'completed') {
+                    step.classList.add('completed');
+                } else {
+                    if (stepIdx < currentIdx) {
+                        step.classList.add('completed');
+                    } else if (stepIdx === currentIdx) {
+                        step.classList.add('active');
+                    }
+                }
+            });
+        }
+
+        function updateActivityLog(logEntries) {
+            const logEl = document.getElementById('activityLog');
+            const logDot = document.getElementById('logDot');
+
+            if (!logEntries || logEntries.length === 0) return;
+            if (logEntries.length === lastLogCount) return;
+
+            // Clear empty state on first entry
+            if (lastLogCount === 0) {
+                logEl.innerHTML = '';
+            }
+
+            // Append only new entries
+            for (let i = lastLogCount; i < logEntries.length; i++) {
+                const entry = logEntries[i];
+                const div = document.createElement('div');
+                const stepLabel = (entry.step || '').replace(/_/g, ' ');
+                const isSuccess = entry.message && (entry.message.startsWith('Done!') || entry.message.includes('valid'));
+                const isError = entry.step === 'failed';
+
+                div.className = 'log-entry' + (isSuccess ? ' log-success' : '') + (isError ? ' log-error' : '');
+                div.innerHTML = `<span class="log-index">${i + 1}</span><span class="log-step">[${stepLabel}]</span><span class="log-message">${escapeHtml(entry.message)}</span>`;
+                logEl.appendChild(div);
+            }
+
+            lastLogCount = logEntries.length;
+
+            // Auto-scroll to bottom
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         async function updateStatus(workflowId) {
             try {
                 const response = await fetch(`/workflows/v1/status/${workflowId}`);
@@ -478,20 +594,30 @@
                 const statusEl = document.getElementById('workflowStatus');
                 const progressBar = document.getElementById('progressBar');
                 const progressText = document.getElementById('progressText');
-                const messageEl = document.getElementById('workflowMessage');
 
                 // Format status text
                 const statusText = (data.status || 'unknown').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                 statusEl.textContent = statusText;
                 statusEl.className = 'status-value badge badge-' + (data.status || 'unknown');
 
-                // Update message
-                messageEl.textContent = data.message || 'Processing...';
-
                 // Smooth progress animation
                 const progress = data.progress || 0;
                 progressBar.style.width = progress + '%';
                 progressText.textContent = progress + '%';
+
+                // Update timeline stepper
+                updateTimeline(data.status || 'initializing');
+
+                // Update activity log
+                updateActivityLog(data.log_entries || []);
+
+                // Update log dot state
+                const logDot = document.getElementById('logDot');
+                if (data.status === 'completed' || data.status === 'failed') {
+                    logDot.classList.add('inactive');
+                } else {
+                    logDot.classList.remove('inactive');
+                }
 
                 // Handle completion
                 if (data.status === 'completed' || data.status === 'failed') {
@@ -500,14 +626,14 @@
                     btnText.textContent = 'Start New Generation';
 
                     if (data.status === 'completed') {
-                        showToast('✨ Generation completed successfully! Review your terms now.', 'success');
+                        showToast('Generation completed successfully! Review your terms now.', 'success');
                         setTimeout(() => {
                             if (confirm('Generation complete! Would you like to review the generated terms?')) {
                                 window.location.href = '/review';
                             }
                         }, 500);
                     } else if (data.status === 'failed') {
-                        showToast(`❌ Workflow failed: ${data.message || 'Unknown error'}`, 'error');
+                        showToast(`Workflow failed: ${data.message || 'Unknown error'}`, 'error');
                     }
                 }
 

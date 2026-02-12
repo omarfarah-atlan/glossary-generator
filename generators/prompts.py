@@ -12,7 +12,8 @@ class PromptTemplates:
         asset_type: str,
         description: Optional[str] = None,
         columns: Optional[List[dict]] = None,
-        usage_stats: Optional[dict] = None
+        usage_stats: Optional[dict] = None,
+        sql_definition: Optional[str] = None,
     ) -> str:
         """Generate a prompt for creating a glossary term definition."""
 
@@ -36,6 +37,15 @@ class PromptTemplates:
                     col_desc += f": {col['description']}"
                 prompt += col_desc + "\n"
 
+        if sql_definition:
+            prompt += f"""
+## SQL Transformation
+The following SQL shows how this asset is constructed. Use it to explain the transformation logic in business terms:
+```sql
+{sql_definition}
+```
+"""
+
         if usage_stats:
             prompt += f"""
 ## Usage Statistics
@@ -50,6 +60,7 @@ Based on the information above, generate a business glossary term definition. Fo
 1. What this data represents in business terms
 2. How it might be used by analysts and business users
 3. Key concepts and relationships
+4. What transformations or business logic are applied (if SQL is provided)
 
 Respond with a JSON object in this exact format:
 {

@@ -21,6 +21,15 @@ class GlossaryGenerationWorkflow:
         self._status = "initializing"
         self._progress = 0
         self._status_message = "Initializing workflow..."
+        self._log_entries = []
+
+    def _log(self, message: str, step: str = ""):
+        """Append a timestamped log entry and update status message."""
+        self._status_message = message
+        self._log_entries.append({
+            "message": message,
+            "step": step or self._status,
+        })
 
     @workflow.run
     async def run(self, config_dict: dict) -> dict:
@@ -33,7 +42,7 @@ class GlossaryGenerationWorkflow:
         # Step 1: Validate configuration (5%)
         self._status = "validating"
         self._progress = 5
-        self._status_message = "Validating glossary configuration..."
+        self._log("Validating glossary configuration...", "validating")
 
         validation = await workflow.execute_activity(
             GlossaryActivities.validate_configuration,
@@ -46,16 +55,16 @@ class GlossaryGenerationWorkflow:
             result.status = "failed"
             result.error_message = validation.get("error", "Invalid configuration")
             self._status = "failed"
-            self._status_message = f"Failed: {result.error_message}"
+            self._log(f"Failed: {result.error_message}", "failed")
             return result.model_dump()
 
         config = WorkflowConfig(**validation["config"])
-        self._status_message = f"Configuration valid. Target glossary: {config.target_glossary_qn}"
+        self._log(f"Configuration valid. Target glossary: {config.target_glossary_qn}", "validating")
 
         # Step 2: Fetch metadata from Atlan (15%)
         self._status = "fetching_metadata"
         self._progress = 15
-        self._status_message = f"Fetching {', '.join(config.asset_types)} metadata from Atlan (max {config.max_assets})..."
+        self._log(f"Fetching {', '.join(config.asset_types)} metadata from Atlan (max {config.max_assets})...", "fetching_metadata")
 
         assets_dict = await workflow.execute_activity(
             GlossaryActivities.fetch_metadata,
@@ -69,15 +78,15 @@ class GlossaryGenerationWorkflow:
             result.status = "completed"
             result.error_message = "No assets found matching criteria"
             self._status = "completed"
-            self._status_message = "Completed: No assets found matching criteria."
+            self._log("Completed: No assets found matching criteria.", "completed")
             return result.model_dump()
 
-        self._status_message = f"Found {len(assets_dict)} assets."
+        self._log(f"Found {len(assets_dict)} assets.", "fetching_metadata")
 
         # Step 3: Fetch usage signals (30%)
         self._status = "fetching_usage"
         self._progress = 30
-        self._status_message = f"Fetching usage signals for {len(assets_dict)} assets..."
+        self._log(f"Fetching usage signals for {len(assets_dict)} assets...", "fetching_usage")
 
         usage_dict = await workflow.execute_activity(
             GlossaryActivities.fetch_usage_signals,
@@ -86,12 +95,12 @@ class GlossaryGenerationWorkflow:
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
 
-        self._status_message = f"Usage signals fetched for {len(usage_dict)} assets."
+        self._log(f"Usage signals fetched for {len(usage_dict)} assets.", "fetching_usage")
 
         # Step 4: Prioritize assets (40%)
         self._status = "prioritizing"
         self._progress = 40
-        self._status_message = f"Prioritizing {len(assets_dict)} assets by usage and metadata quality..."
+        self._log(f"Prioritizing {len(assets_dict)} assets by usage and metadata quality...", "prioritizing")
 
         prioritized = await workflow.execute_activity(
             GlossaryActivities.prioritize_assets,
@@ -101,12 +110,12 @@ class GlossaryGenerationWorkflow:
         )
 
         result.total_assets_processed = len(prioritized)
-        self._status_message = f"Prioritized top {len(prioritized)} assets for term generation."
+        self._log(f"Prioritized top {len(prioritized)} assets for term generation.", "prioritizing")
 
         # Step 5: Generate term definitions (50%)
         self._status = "generating_definitions"
         self._progress = 50
-        self._status_message = f"Generating glossary definitions for {len(prioritized)} assets using LLM... (this may take a few minutes)"
+        self._log(f"Generating glossary definitions for {len(prioritized)} assets using LLM... (this may take a few minutes)", "generating_definitions")
 
         terms_dict = await workflow.execute_activity(
             GlossaryActivities.generate_term_definitions,
@@ -120,15 +129,15 @@ class GlossaryGenerationWorkflow:
             result.status = "completed"
             result.error_message = "No terms generated"
             self._status = "completed"
-            self._status_message = "Completed: LLM did not generate any terms."
+            self._log("Completed: LLM did not generate any terms.", "completed")
             return result.model_dump()
 
-        self._status_message = f"Generated {len(terms_dict)} term definitions."
+        self._log(f"Generated {len(terms_dict)} term definitions.", "generating_definitions")
 
         # Step 6: Save draft terms (85%)
         self._status = "saving_drafts"
         self._progress = 85
-        self._status_message = f"Saving {len(terms_dict)} draft terms to state store..."
+        self._log(f"Saving {len(terms_dict)} draft terms to state store...", "saving_drafts")
 
         # Use workflow.uuid4() for Temporal-safe deterministic UUID
         batch_id = str(workflow.uuid4())
@@ -141,12 +150,12 @@ class GlossaryGenerationWorkflow:
 
         result.total_terms_generated = batch_result.get("terms_generated", 0)
         result.total_terms_failed = batch_result.get("terms_failed", 0)
-        self._status_message = f"Saved {result.total_terms_generated} terms ({result.total_terms_failed} failed)."
+        self._log(f"Saved {result.total_terms_generated} terms ({result.total_terms_failed} failed).", "saving_drafts")
 
         # Step 7: Notify stewards (95%)
         self._status = "notifying"
         self._progress = 95
-        self._status_message = "Notifying data stewards for review..."
+        self._log("Notifying data stewards for review...", "notifying")
 
         await workflow.execute_activity(
             GlossaryActivities.notify_stewards,
@@ -158,7 +167,7 @@ class GlossaryGenerationWorkflow:
         self._status = "completed"
         self._progress = 100
         result.status = "completed"
-        self._status_message = f"Done! Generated {result.total_terms_generated} glossary terms ready for review."
+        self._log(f"Done! Generated {result.total_terms_generated} glossary terms ready for review.", "completed")
 
         return result.model_dump()
 
@@ -176,6 +185,11 @@ class GlossaryGenerationWorkflow:
     def get_status_message(self) -> str:
         """Query current workflow status message with details."""
         return self._status_message
+
+    @workflow.query
+    def get_log(self) -> list:
+        """Query full log of workflow messages."""
+        return self._log_entries
 
 
 @workflow.defn

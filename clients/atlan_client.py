@@ -73,6 +73,8 @@ class AtlanMetadataClient:
                 FluentSearch()
                 .where(Asset.SUPER_TYPE_NAMES.eq("SQL"))
                 .where(Asset.TYPE_NAME.within(asset_types))
+                .include_on_results(View.DEFINITION)
+                .include_on_results(Table.TABLE_DEFINITION)
                 .page_size(min(max_results, 100))
             )
 
@@ -108,6 +110,9 @@ class AtlanMetadataClient:
                         is_nullable=getattr(col, "is_nullable", True),
                     ))
 
+            # Extract SQL definition (View.definition or Table.table_definition)
+            sql_definition = getattr(asset, "definition", None) or getattr(asset, "table_definition", None)
+
             return AssetMetadata(
                 qualified_name=asset.qualified_name,
                 name=asset.name,
@@ -121,6 +126,7 @@ class AtlanMetadataClient:
                 owner=getattr(asset, "owner_users", [None])[0] if getattr(asset, "owner_users", None) else None,
                 database_name=getattr(asset, "database_name", None),
                 schema_name=getattr(asset, "schema_name", None),
+                sql_definition=sql_definition,
             )
         except Exception as e:
             logger.warning(f"Error converting asset {getattr(asset, 'name', 'unknown')}: {e}")

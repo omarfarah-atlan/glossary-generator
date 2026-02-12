@@ -66,6 +66,7 @@ class AssetMetadata(BaseModel):
     schema_name: Optional[str] = None
     upstream_assets: List[str] = Field(default_factory=list)
     downstream_assets: List[str] = Field(default_factory=list)
+    sql_definition: Optional[str] = None
 
 
 class ColumnMetadata(BaseModel):

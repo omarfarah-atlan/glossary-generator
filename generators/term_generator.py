@@ -49,6 +49,7 @@ class TermGenerator:
                     description=context.get("description"),
                     columns=context.get("columns"),
                     usage_stats=context.get("usage_stats"),
+                    sql_definition=context.get("sql_definition"),
                 )
 
                 # Create draft from result

@@ -66,6 +66,10 @@ class ContextBuilder:
         if asset.schema_name:
             context["schema"] = asset.schema_name
 
+        # Add SQL definition/transformation
+        if asset.sql_definition:
+            context["sql_definition"] = asset.sql_definition[:1500]
+
         # Add lineage information (from MDLH)
         if asset.upstream_assets:
             context["upstream_assets"] = asset.upstream_assets[:10]
@@ -107,7 +111,15 @@ class ContextBuilder:
         # Progressively remove less important fields
         truncated = context.copy()
 
-        # First, remove lineage details (keep counts)
+        # First, remove SQL definition (large but less structured than columns)
+        if "sql_definition" in truncated:
+            del truncated["sql_definition"]
+
+        serialized = json.dumps(truncated)
+        if self.estimate_token_count(serialized) <= max_tokens:
+            return truncated
+
+        # Next, remove lineage details (keep counts)
         if "upstream_assets" in truncated:
             del truncated["upstream_assets"]
         if "downstream_assets" in truncated:

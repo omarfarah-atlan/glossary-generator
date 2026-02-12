@@ -5,18 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings - Glossary Generator</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232026d2'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white' font-family='system-ui'>G</text></svg>">
 </head>
 <body>
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
     <div class="container">
         <header>
-            <h1>Settings</h1>
-            <p class="subtitle">Configure API credentials and application settings</p>
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo-icon">
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                            <rect width="32" height="32" rx="8" fill="#2026d2"/>
+                            <path d="M9 12h6v2H9v-2zm0 4h14v2H9v-2zm0 4h10v2H9v-2z" fill="white"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1>Business Glossary Generator</h1>
+                        <p class="subtitle">Configure API credentials and application settings</p>
+                    </div>
+                </div>
+                <div class="header-badge">
+                    <span class="beta-badge">Beta</span>
+                </div>
+            </div>
         </header>
 
         <nav class="nav-tabs">
-            <a href="/" class="nav-tab">Generate</a>
-            <a href="/review" class="nav-tab">Review Terms</a>
-            <a href="/settings" class="nav-tab active">Settings</a>
+            <a href="/" class="nav-tab">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 2l6 4v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6l6-4z"/>
+                </svg>
+                Generate
+            </a>
+            <a href="/review" class="nav-tab">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M3 3h10a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1zm2 3h6v1H5V6zm0 3h4v1H5V9z"/>
+                </svg>
+                Review Terms
+            </a>
+            <a href="/settings" class="nav-tab active">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 10a2 2 0 100-4 2 2 0 000 4z"/>
+                    <path d="M9.5 2.5l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5-1.5-.5 1.5-.5.5-1.5z"/>
+                </svg>
+                Settings
+            </a>
         </nav>
 
         <main>
@@ -179,7 +214,10 @@
         </main>
 
         <footer>
-            <p>Powered by Atlan Application SDK</p>
+            <div class="footer-content">
+                <p>Powered by <strong>Atlan Application SDK</strong> • AI by <strong>Claude Sonnet 4</strong></p>
+                <p class="footer-meta">&copy; 2026 Atlan • Business Glossary Generator v1.0</p>
+            </div>
         </footer>
     </div>
 
