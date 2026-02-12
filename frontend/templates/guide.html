@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How To - Glossary Generator</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232026d2'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white' font-family='system-ui'>G</text></svg>">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo-icon">
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                            <rect width="32" height="32" rx="8" fill="#2026d2"/>
+                            <path d="M9 12h6v2H9v-2zm0 4h14v2H9v-2zm0 4h10v2H9v-2z" fill="white"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1>Business Glossary Generator</h1>
+                        <p class="subtitle">How it works and how to use it</p>
+                    </div>
+                </div>
+                <div class="header-badge">
+                    <span class="beta-badge">Beta</span>
+                </div>
+            </div>
+        </header>
+
+        <nav class="nav-tabs">
+            <a href="/" class="nav-tab">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 2l6 4v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6l6-4z"/>
+                </svg>
+                Generate
+            </a>
+            <a href="/review" class="nav-tab">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M3 3h10a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1zm2 3h6v1H5V6zm0 3h4v1H5V9z"/>
+                </svg>
+                Review Terms
+            </a>
+            <a href="/settings" class="nav-tab">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 10a2 2 0 100-4 2 2 0 000 4z"/>
+                    <path d="M9.5 2.5l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5-1.5-.5 1.5-.5.5-1.5z"/>
+                </svg>
+                Settings
+            </a>
+            <a href="/guide" class="nav-tab active">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 2.5a1 1 0 110 2 1 1 0 010-2zM7 7h2v5H7V7z"/>
+                </svg>
+                How To
+            </a>
+        </nav>
+
+        <main>
+            <section class="card guide-card">
+                <div class="guide-section">
+                    <h2 class="guide-heading">What is the Business Glossary Generator?</h2>
+                    <p>This app automatically creates business glossary terms from the data assets in your Atlan catalog. It reads your tables, views, and columns, then uses AI (Claude) to write clear, business-friendly definitions that your team can review and publish back to Atlan.</p>
+                    <p>The goal is to turn technical metadata into a shared vocabulary that everyone in the organization can understand &mdash; without manually writing every definition from scratch.</p>
+                </div>
+
+                <div class="guide-section">
+                    <h2 class="guide-heading">How It Works</h2>
+                    <div class="guide-steps">
+                        <div class="guide-step">
+                            <div class="guide-step-number">1</div>
+                            <div>
+                                <h3>Configure</h3>
+                                <p>Pick a target glossary, optionally filter by connector or connection, choose which term types to generate, and set how many terms you want.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="guide-step-number">2</div>
+                            <div>
+                                <h3>Generate</h3>
+                                <p>The app fetches assets from Atlan, ranks them by usage and metadata quality, then sends the top candidates to AI. The AI writes a definition for each asset and classifies it as a Business Term, Metric, or Dimension.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="guide-step-number">3</div>
+                            <div>
+                                <h3>Review</h3>
+                                <p>All generated terms land in the Review tab as drafts. You can approve, reject, or edit each term. Bulk actions let you approve or reject multiple terms at once.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="guide-step-number">4</div>
+                            <div>
+                                <h3>Publish</h3>
+                                <p>Approved terms are published to your Atlan glossary with one click. Each term is automatically placed in the correct category (Business Terms, Metrics, or Dimensions).</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="guide-section">
+                    <h2 class="guide-heading">Term Types</h2>
+                    <div class="guide-types">
+                        <div class="guide-type">
+                            <span class="badge badge-business_term">Business Term</span>
+                            <p>A core business concept derived from a data asset. Example: table <code>DIM_CUSTOMER</code> becomes a term called <strong>"Customer"</strong> with a definition describing what a customer is to the business.</p>
+                        </div>
+                        <div class="guide-type">
+                            <span class="badge badge-metric">Metric</span>
+                            <p>A measurable value or KPI. Example: table <code>MONTHLY_REVENUE</code> becomes <strong>"Monthly Revenue"</strong> with a definition explaining the calculation, units, and business targets.</p>
+                        </div>
+                        <div class="guide-type">
+                            <span class="badge badge-dimension">Dimension</span>
+                            <p>A categorical attribute for filtering and grouping. Example: table <code>EMPLOYEE_DIMENSION</code> becomes <strong>"Employee"</strong> describing how employees are segmented for analysis.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="guide-section">
+                    <h2 class="guide-heading">Quick Start</h2>
+                    <ol class="guide-list">
+                        <li>Go to <strong>Settings</strong> and enter your Atlan API token and Anthropic API key. Click "Test Connection" to verify.</li>
+                        <li>Go to <strong>Generate</strong>, select your target glossary, pick the term types you want, set the number of terms (1&ndash;15), and click <strong>Start Generation</strong>.</li>
+                        <li>Watch the progress in the activity log. Generation usually finishes in under a minute.</li>
+                        <li>Go to <strong>Review Terms</strong> to see the generated drafts. Click any term to view and edit its definition.</li>
+                        <li>Approve the terms you like, then click <strong>Publish Approved</strong> to push them to Atlan.</li>
+                    </ol>
+                </div>
+
+                <div class="guide-section">
+                    <h2 class="guide-heading">Tips</h2>
+                    <ul class="guide-list">
+                        <li><strong>Upload context files</strong> &mdash; data dictionaries, docs, or schemas uploaded on the Generate page help the AI write better definitions.</li>
+                        <li><strong>Start small</strong> &mdash; generate 3&ndash;5 terms first to check quality before running larger batches.</li>
+                        <li><strong>Deduplication is automatic</strong> &mdash; existing terms in the target glossary and previously generated drafts are skipped.</li>
+                        <li><strong>Edit before publishing</strong> &mdash; click any term on the Review page to refine the name, definition, or examples before it goes to Atlan.</li>
+                        <li><strong>Clear All</strong> removes every draft from the review queue, so you can start fresh.</li>
+                    </ul>
+                </div>
+
+                <div class="guide-section">
+                    <h2 class="guide-heading">Architecture</h2>
+                    <p>The app runs on the <strong>Atlan Application SDK</strong> with these components:</p>
+                    <ul class="guide-list">
+                        <li><strong>FastAPI</strong> &mdash; serves the web UI and REST API</li>
+                        <li><strong>Temporal</strong> &mdash; orchestrates the multi-step generation workflow with retries and progress tracking</li>
+                        <li><strong>Dapr</strong> &mdash; state store for persisting draft terms between sessions</li>
+                        <li><strong>Pyatlan SDK</strong> &mdash; reads assets from and publishes terms to Atlan</li>
+                        <li><strong>Claude (via LiteLLM)</strong> &mdash; generates term definitions through an OpenAI-compatible proxy</li>
+                    </ul>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <div class="footer-content">
+                <p>Powered by <strong>Atlan Application SDK</strong> &bull; AI by <strong>Claude Sonnet 4</strong></p>
+                <p class="footer-meta">&copy; 2026 Atlan &bull; Business Glossary Generator v1.0</p>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

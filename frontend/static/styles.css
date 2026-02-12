@@ -868,6 +868,119 @@ header h1 {
     background: linear-gradient(90deg, #f0fdf4 0%, var(--atlan-bg-card) 8%);
 }
 
+/* Guide page */
+.guide-card {
+    padding: 32px 36px;
+    line-height: 1.7;
+}
+
+.guide-section {
+    margin-bottom: 32px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--atlan-border-light);
+}
+
+.guide-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.guide-heading {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--atlan-text);
+    margin: 0 0 12px 0;
+}
+
+.guide-section p {
+    color: var(--atlan-text-secondary);
+    margin: 0 0 10px 0;
+    font-size: 0.92rem;
+}
+
+.guide-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.guide-step {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.guide-step-number {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--atlan-primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.guide-step h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--atlan-text);
+    margin: 0 0 4px 0;
+}
+
+.guide-step p {
+    margin: 0;
+}
+
+.guide-types {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.guide-type {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.guide-type .badge {
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+
+.guide-type p {
+    margin: 0;
+}
+
+.guide-type code {
+    background: var(--atlan-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--atlan-text);
+}
+
+.guide-list {
+    color: var(--atlan-text-secondary);
+    font-size: 0.92rem;
+    padding-left: 22px;
+    margin: 8px 0 0 0;
+}
+
+.guide-list li {
+    margin-bottom: 8px;
+}
+
+.guide-list li strong {
+    color: var(--atlan-text);
+}
+
 /* Form sections */
 .form-section {
     padding: 20px 0;

@@ -52,46 +52,15 @@
                 </svg>
                 Settings
             </a>
+            <a href="/guide" class="nav-tab">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 2.5a1 1 0 110 2 1 1 0 010-2zM7 7h2v5H7V7z"/>
+                </svg>
+                How To
+            </a>
         </nav>
 
         <main>
-            <!-- Quick Stats -->
-            <div class="quick-stats">
-                <div class="stat-item">
-                    <div class="stat-icon stat-icon-primary">
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 5h2v6H9V5zm0 8h2v2H9v-2z"/>
-                        </svg>
-                    </div>
-                    <div class="stat-content">
-                        <div class="stat-value" id="dataSourceLabel">MDLH Direct</div>
-                        <div class="stat-label">Data Source</div>
-                    </div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-icon stat-icon-success">
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10 3a7 7 0 100 14 7 7 0 000-14zm3.5 6l-4 4-2-2 .7-.7 1.3 1.3 3.3-3.3.7.7z"/>
-                        </svg>
-                    </div>
-                    <div class="stat-content">
-                        <div class="stat-value">AI-Powered</div>
-                        <div class="stat-label">Claude Sonnet 4</div>
-                    </div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-icon stat-icon-info">
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M4 4h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm2 4h8v1H6V8zm0 3h6v1H6v-1z"/>
-                        </svg>
-                    </div>
-                    <div class="stat-content">
-                        <div class="stat-value">Auto-Review</div>
-                        <div class="stat-label">Quality Checks</div>
-                    </div>
-                </div>
-            </div>
-
             <section class="card main-card">
                 <div class="card-header-section">
                     <h2>
@@ -431,12 +400,8 @@
 
                 // Show warning if not configured
                 if (!settings.is_configured) {
-                    showToast('⚠️ Please configure your API credentials in Settings before starting', 'warning');
+                    showToast('Please configure your API credentials in Settings before starting', 'warning');
                 }
-
-                // Update data source label
-                const useMDLH = settings.snowflake_account && settings.snowflake_user;
-                document.getElementById('dataSourceLabel').textContent = useMDLH ? 'MDLH Direct' : 'Atlan SDK';
                 
             } catch (error) {
                 console.error('Error loading settings:', error);

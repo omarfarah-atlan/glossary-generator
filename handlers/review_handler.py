@@ -488,6 +488,12 @@ async def get_stats():
 
 # Settings endpoints
 
+@router.get("/guide", response_class=HTMLResponse)
+async def guide_page(request: Request):
+    """Render the how-to guide page."""
+    return templates.TemplateResponse("guide.html", {"request": request})
+
+
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
     """Render the settings page."""
