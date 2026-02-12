@@ -207,17 +207,20 @@ class AtlanMetadataClient:
         """Fetch all connections from Atlan, optionally filtered by connector type."""
         try:
             search = FluentSearch().where(Connection.TYPE_NAME.eq("Connection"))
-
-            if connector_type:
-                search = search.where(Connection.CONNECTOR_NAME.eq(connector_type.lower()))
-
             search = search.page_size(100)
 
             results = self.client.asset.search(search.to_request())
             connections = []
 
             for conn in results:
-                connector_name = getattr(conn, "connector_name", None) or getattr(conn, "connector_type", "unknown")
+                # Extract connector type from qualified name (format: default/{connector}/{id})
+                qn_parts = conn.qualified_name.split("/")
+                connector_name = qn_parts[1] if len(qn_parts) > 1 else "unknown"
+
+                # Filter by connector type if specified
+                if connector_type and connector_name.lower() != connector_type.lower():
+                    continue
+
                 connections.append({
                     "name": conn.name,
                     "qualified_name": conn.qualified_name,
@@ -246,9 +249,10 @@ class AtlanMetadataClient:
             connector_types = set()
 
             for conn in results:
-                connector_name = getattr(conn, "connector_name", None) or getattr(conn, "connector_type", None)
-                if connector_name:
-                    connector_types.add(connector_name)
+                # Extract connector type from qualified name (format: default/{connector}/{id})
+                qn_parts = conn.qualified_name.split("/")
+                if len(qn_parts) > 1:
+                    connector_types.add(qn_parts[1])
 
             # Convert to list of dicts with display names
             connectors = []
