@@ -4,7 +4,7 @@ import os
 import logging
 from typing import Dict, List, Optional
 
-from app.models import AssetMetadata
+from app.models import AssetMetadata, ColumnMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 class MDLHClient:
     """Client for querying Atlan's MDLH Snowflake tables.
 
-    Supplements Atlan API data with lineage (BASE_EDGES) and
+    Can be used as primary data source (fetch_assets_with_descriptions)
+    or for enrichment (enrich_assets) with lineage (BASE_EDGES) and
     additional metadata (ASSETS) from the MDLH gold layer.
     Uses externalbrowser (SSO) authentication.
     """
@@ -86,6 +87,176 @@ class MDLHClient:
         except Exception as e:
             logger.error(f"MDLH connection test failed: {e}")
             return {"success": False, "error": str(e)}
+
+    async def fetch_assets_with_descriptions(
+        self,
+        asset_types: List[str],
+        max_results: int = 100,
+        min_popularity: float = 0.0,
+        connection_qualified_name: Optional[str] = None,
+    ) -> List[AssetMetadata]:
+        """Fetch SQL assets directly from MDLH Snowflake tables.
+        
+        This method queries MDLH as the PRIMARY data source, not enrichment.
+        """
+        if not self.is_configured:
+            logger.warning("MDLH not configured, returning empty list")
+            return []
+
+        assets = []
+        
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Map asset types to MDLH type names
+            type_conditions = []
+            for asset_type in asset_types:
+                if asset_type == "Table":
+                    type_conditions.append("ASSET_TYPE = 'Table'")
+                elif asset_type == "View":
+                    type_conditions.append("ASSET_TYPE = 'View'")
+                elif asset_type == "MaterializedView":
+                    type_conditions.append("ASSET_TYPE = 'MaterialisedView'")
+
+            if not type_conditions:
+                logger.warning(f"No supported asset types in: {asset_types}")
+                return []
+
+            type_filter = " OR ".join(type_conditions)
+
+            # Build query
+            query = f"""
+                SELECT
+                    ASSET_QUALIFIED_NAME,
+                    ASSET_NAME,
+                    ASSET_TYPE,
+                    DESCRIPTION,
+                    COALESCE(POPULARITY_SCORE, 0) AS POPULARITY_SCORE,
+                    CONNECTOR_NAME,
+                    CONNECTION_QUALIFIED_NAME,
+                    DATABASE_NAME,
+                    SCHEMA_NAME,
+                    OWNER_USERS,
+                    GUID
+                FROM {self.database}.{self.schema}.ASSETS
+                WHERE ({type_filter})
+                  AND DESCRIPTION IS NOT NULL
+                  AND DESCRIPTION != ''
+                  AND COALESCE(POPULARITY_SCORE, 0) >= %s
+            """
+            
+            params = [min_popularity]
+            
+            # Add connection filter if specified
+            if connection_qualified_name:
+                query += " AND CONNECTION_QUALIFIED_NAME = %s"
+                params.append(connection_qualified_name)
+            
+            query += f" ORDER BY POPULARITY_SCORE DESC LIMIT {max_results}"
+            
+            logger.info(f"Executing MDLH query with types: {asset_types}, min_popularity: {min_popularity}")
+            cursor.execute(query, params)
+            
+            # Fetch all results
+            rows = cursor.fetchall()
+            logger.info(f"MDLH returned {len(rows)} assets")
+            
+            # Get column names for reference
+            column_names = [desc[0] for desc in cursor.description]
+            
+            for row in rows:
+                row_dict = dict(zip(column_names, row))
+                
+                asset = AssetMetadata(
+                    qualified_name=row_dict["ASSET_QUALIFIED_NAME"],
+                    name=row_dict["ASSET_NAME"],
+                    asset_type=row_dict["ASSET_TYPE"],
+                    description=row_dict["DESCRIPTION"],
+                    popularity_score=float(row_dict["POPULARITY_SCORE"]) if row_dict["POPULARITY_SCORE"] else 0.0,
+                    connector_name=row_dict["CONNECTOR_NAME"],
+                    connection_qualified_name=row_dict["CONNECTION_QUALIFIED_NAME"],
+                    database_name=row_dict["DATABASE_NAME"],
+                    schema_name=row_dict["SCHEMA_NAME"],
+                    owner=row_dict["OWNER_USERS"][0] if row_dict["OWNER_USERS"] else None,
+                )
+                assets.append(asset)
+            
+            cursor.close()
+            
+            # Fetch columns for these assets
+            if assets:
+                assets = self._enrich_with_columns(assets)
+            
+            # Fetch lineage for these assets
+            if assets:
+                qualified_names = [a.qualified_name for a in assets]
+                lineage = self.fetch_lineage(qualified_names)
+                for asset in assets:
+                    if asset.qualified_name in lineage:
+                        asset.upstream_assets = lineage[asset.qualified_name].get("upstream", [])
+                        asset.downstream_assets = lineage[asset.qualified_name].get("downstream", [])
+            
+            logger.info(f"Fetched {len(assets)} assets from MDLH with columns and lineage")
+            return assets
+
+        except Exception as e:
+            logger.error(f"Error fetching assets from MDLH: {e}", exc_info=True)
+            return []
+
+    def _enrich_with_columns(self, assets: List[AssetMetadata]) -> List[AssetMetadata]:
+        """Fetch and attach column metadata for assets."""
+        if not assets:
+            return assets
+        
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            # Get all table qualified names
+            table_qns = [a.qualified_name for a in assets]
+            placeholders = ", ".join(["%s"] * len(table_qns))
+            
+            # Query columns table (assuming it exists in MDLH)
+            query = f"""
+                SELECT
+                    c.TABLE_QUALIFIED_NAME,
+                    c.NAME AS COLUMN_NAME,
+                    c.DATA_TYPE,
+                    c.DESCRIPTION
+                FROM {self.database}.{self.schema}.COLUMN c
+                WHERE c.TABLE_QUALIFIED_NAME IN ({placeholders})
+                ORDER BY c.TABLE_QUALIFIED_NAME, c.ORDER
+            """
+            
+            cursor.execute(query, table_qns)
+            
+            # Group columns by table
+            columns_by_table: Dict[str, List[ColumnMetadata]] = {}
+            for row in cursor:
+                table_qn = row[0]
+                col = ColumnMetadata(
+                    name=row[1],
+                    data_type=row[2],
+                    description=row[3],
+                )
+                if table_qn not in columns_by_table:
+                    columns_by_table[table_qn] = []
+                columns_by_table[table_qn].append(col)
+            
+            cursor.close()
+            
+            # Attach columns to assets
+            for asset in assets:
+                if asset.qualified_name in columns_by_table:
+                    asset.columns = columns_by_table[asset.qualified_name]
+                    
+            logger.info(f"Enriched {len(columns_by_table)} assets with column metadata")
+            
+        except Exception as e:
+            logger.warning(f"Could not fetch columns from MDLH (continuing without): {e}")
+        
+        return assets
 
     def fetch_asset_details(self, qualified_names: List[str]) -> Dict[str, dict]:
         """Fetch asset details from ASSETS table by qualified name.

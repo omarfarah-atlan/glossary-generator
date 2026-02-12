@@ -1,5 +1,6 @@
 """Workflow activities for glossary generation."""
 
+import os
 import logging
 import json
 from typing import Dict, List, Optional
@@ -97,26 +98,49 @@ class GlossaryActivities:
 
     @activity.defn
     async def fetch_metadata(self, config_dict: dict) -> List[dict]:
-        """Fetch asset metadata from Atlan."""
+        """Fetch asset metadata from MDLH or Atlan (based on USE_MDLH_PRIMARY env var)."""
         try:
             config = WorkflowConfig(**config_dict)
+            
+            # Check if we should use MDLH as primary source
+            use_mdlh_primary = os.environ.get("USE_MDLH_PRIMARY", "false").lower() == "true"
+            
+            # Try MDLH first if configured and requested
+            if use_mdlh_primary:
+                mdlh = self.mdlh_client
+                if mdlh is not None:
+                    try:
+                        activity.heartbeat("Fetching assets directly from MDLH (may require SSO login)...")
+                        logger.info(f"Using MDLH as PRIMARY data source")
+                        assets = await mdlh.fetch_assets_with_descriptions(
+                            asset_types=config.asset_types,
+                            max_results=config.max_assets,
+                            min_popularity=config.min_popularity_score,
+                            connection_qualified_name=getattr(config, 'connection_qualified_name', None),
+                        )
+                        logger.info(f"MDLH returned {len(assets)} assets (primary source)")
+                        return [asset.model_dump() for asset in assets]
+                    except Exception as e:
+                        logger.error(f"MDLH primary fetch failed, falling back to Atlan SDK: {e}")
 
-            activity.heartbeat("Fetching assets from Atlan...")
+            # Fall back to Atlan SDK (original approach)
+            activity.heartbeat("Fetching assets from Atlan SDK...")
             assets = await self.atlan_client.fetch_assets_with_descriptions(
                 asset_types=config.asset_types,
                 max_results=config.max_assets,
                 min_popularity=config.min_popularity_score,
             )
 
-            # Enrich with MDLH data if configured
-            mdlh = self.mdlh_client
-            if mdlh is not None:
-                try:
-                    activity.heartbeat("Connecting to MDLH (may require SSO login)...")
-                    assets = mdlh.enrich_assets(assets)
-                    logger.info("Assets enriched with MDLH data")
-                except Exception as e:
-                    logger.warning(f"MDLH enrichment failed (continuing without): {e}")
+            # Enrich with MDLH data if configured (when SDK is primary)
+            if not use_mdlh_primary:
+                mdlh = self.mdlh_client
+                if mdlh is not None:
+                    try:
+                        activity.heartbeat("Enriching with MDLH lineage data (may require SSO login)...")
+                        assets = mdlh.enrich_assets(assets)
+                        logger.info("Assets enriched with MDLH data")
+                    except Exception as e:
+                        logger.warning(f"MDLH enrichment failed (continuing without): {e}")
 
             logger.info(f"Fetched {len(assets)} assets")
             return [asset.model_dump() for asset in assets]
