@@ -48,10 +48,11 @@ class AtlanMetadataClient:
     async def validate_glossary_exists(self, glossary_qn: str) -> bool:
         """Check if a glossary exists in Atlan."""
         try:
+            # Use AtlasGlossary attributes for searching
             search = (
                 FluentSearch()
-                .where(FluentSearch.QUALIFIED_NAME.eq(glossary_qn))
-                .where(FluentSearch.TYPE_NAME.eq("AtlasGlossary"))
+                .where(AtlasGlossary.QUALIFIED_NAME.eq(glossary_qn))
+                .where(AtlasGlossary.TYPE_NAME.eq("AtlasGlossary"))
                 .page_size(1)
             )
             results = self.client.asset.search(search)
@@ -73,8 +74,8 @@ class AtlanMetadataClient:
             # Build search for SQL assets with descriptions
             search = (
                 FluentSearch()
-                .where(FluentSearch.SUPER_TYPE_NAMES.eq("SQL"))
-                .where(FluentSearch.TYPE_NAME.within(asset_types))
+                .where(Asset.SUPER_TYPE_NAMES.eq("SQL"))
+                .where(Asset.TYPE_NAME.within(asset_types))
                 .page_size(min(max_results, 100))
             )
 
@@ -167,7 +168,7 @@ class AtlanMetadataClient:
         try:
             search = (
                 FluentSearch()
-                .where(FluentSearch.TYPE_NAME.eq("AtlasGlossaryTerm"))
+                .where(AtlasGlossaryTerm.TYPE_NAME.eq("AtlasGlossaryTerm"))
                 .where(AtlasGlossaryTerm.ANCHOR.eq(glossary_qn))
                 .page_size(1000)
             )
