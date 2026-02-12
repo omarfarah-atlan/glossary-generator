@@ -77,10 +77,16 @@ class SettingsUpdateRequest(BaseModel):
     llm_proxy_url: Optional[str] = None
     claude_model: Optional[str] = None
     default_glossary_qn: Optional[str] = None
+    snowflake_account: Optional[str] = None
+    snowflake_user: Optional[str] = None
+    snowflake_warehouse: Optional[str] = None
+    snowflake_database: Optional[str] = None
+    snowflake_schema: Optional[str] = None
+    snowflake_role: Optional[str] = None
 
 
 def get_all_term_ids() -> List[str]:
-    """Get all term IDs from state store by scanning batch indices."""
+    """Get all term IDs from state store via the master batch index."""
     term_ids = []
 
     client = _get_dapr_client()
@@ -90,10 +96,17 @@ def get_all_term_ids() -> List[str]:
     try:
         from dapr.clients import DaprClient
         with DaprClient() as client:
-            # Scan for batch indices (in production, use proper querying)
-            # For now, we'll try common patterns
-            for i in range(100):  # Check first 100 potential batches
-                key = f"glossary_batch_{i}"
+            # Read master batch index
+            master_state = client.get_state(store_name=DAPR_STORE_NAME, key="glossary_batch_index")
+            if not master_state.data:
+                _mark_dapr_available(True)
+                return term_ids
+
+            master = json.loads(master_state.data)
+            batch_ids = master.get("batch_ids", [])
+
+            for batch_id in batch_ids:
+                key = f"glossary_batch_{batch_id}"
                 try:
                     state = client.get_state(store_name=DAPR_STORE_NAME, key=key)
                     if state.data:
@@ -544,6 +557,30 @@ async def test_atlan_connection():
 
     except Exception as e:
         logger.error(f"Atlan test failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@router.post("/api/v1/settings/test-mdlh")
+async def test_mdlh_connection():
+    """Test the Snowflake MDLH connection."""
+    try:
+        settings = load_settings()
+
+        if not settings.snowflake_account:
+            return {"success": False, "error": "Snowflake account not configured"}
+        if not settings.snowflake_user:
+            return {"success": False, "error": "Snowflake user not configured"}
+
+        from clients.mdlh_client import MDLHClient
+
+        client = MDLHClient()
+        result = client.test_connection()
+        client.close()
+
+        return result
+
+    except Exception as e:
+        logger.error(f"MDLH test failed: {e}")
         return {"success": False, "error": str(e)}
 
 

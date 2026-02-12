@@ -16,6 +16,7 @@ from app.models import (
 )
 from clients.atlan_client import AtlanMetadataClient
 from clients.llm_client import ClaudeClient
+from clients.mdlh_client import MDLHClient
 from clients.usage_client import UsageSignalClient
 from generators.term_generator import TermGenerator
 
@@ -30,6 +31,7 @@ class GlossaryActivities:
     def __init__(self):
         self._atlan_client: Optional[AtlanMetadataClient] = None
         self._llm_client: Optional[ClaudeClient] = None
+        self._mdlh_client: Optional[MDLHClient] = None
         self._usage_client: Optional[UsageSignalClient] = None
         self._term_generator: Optional[TermGenerator] = None
 
@@ -44,6 +46,17 @@ class GlossaryActivities:
         if self._llm_client is None:
             self._llm_client = ClaudeClient()
         return self._llm_client
+
+    @property
+    def mdlh_client(self) -> Optional[MDLHClient]:
+        """Lazy init of MDLH client. Returns None if not configured."""
+        if self._mdlh_client is None:
+            client = MDLHClient()
+            if client.is_configured:
+                self._mdlh_client = client
+            else:
+                return None
+        return self._mdlh_client
 
     @property
     def usage_client(self) -> UsageSignalClient:
@@ -88,11 +101,22 @@ class GlossaryActivities:
         try:
             config = WorkflowConfig(**config_dict)
 
+            activity.heartbeat("Fetching assets from Atlan...")
             assets = await self.atlan_client.fetch_assets_with_descriptions(
                 asset_types=config.asset_types,
                 max_results=config.max_assets,
                 min_popularity=config.min_popularity_score,
             )
+
+            # Enrich with MDLH data if configured
+            mdlh = self.mdlh_client
+            if mdlh is not None:
+                try:
+                    activity.heartbeat("Connecting to MDLH (may require SSO login)...")
+                    assets = mdlh.enrich_assets(assets)
+                    logger.info("Assets enriched with MDLH data")
+                except Exception as e:
+                    logger.warning(f"MDLH enrichment failed (continuing without): {e}")
 
             logger.info(f"Fetched {len(assets)} assets")
             return [asset.model_dump() for asset in assets]
@@ -205,6 +229,26 @@ class GlossaryActivities:
                     store_name=DAPR_STORE_NAME,
                     key=f"glossary_batch_{batch_id}",
                     value=json.dumps(batch_index),
+                )
+
+                # Update master batch index so review page can find all batches
+                master_key = "glossary_batch_index"
+                try:
+                    master_state = client.get_state(store_name=DAPR_STORE_NAME, key=master_key)
+                    if master_state.data:
+                        master = json.loads(master_state.data)
+                    else:
+                        master = {"batch_ids": []}
+                except Exception:
+                    master = {"batch_ids": []}
+
+                if batch_id not in master["batch_ids"]:
+                    master["batch_ids"].append(batch_id)
+
+                client.save_state(
+                    store_name=DAPR_STORE_NAME,
+                    key=master_key,
+                    value=json.dumps(master),
                 )
 
                 result.term_ids = term_ids

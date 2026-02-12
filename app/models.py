@@ -64,6 +64,8 @@ class AssetMetadata(BaseModel):
     owner: Optional[str] = None
     database_name: Optional[str] = None
     schema_name: Optional[str] = None
+    upstream_assets: List[str] = Field(default_factory=list)
+    downstream_assets: List[str] = Field(default_factory=list)
 
 
 class ColumnMetadata(BaseModel):
@@ -129,10 +131,20 @@ class AppSettings(BaseModel):
     llm_proxy_url: str = "https://llmproxy.atlan.dev"
     claude_model: str = "claude-sonnet-4.5"
     default_glossary_qn: Optional[str] = None
+    snowflake_account: Optional[str] = None
+    snowflake_user: Optional[str] = None
+    snowflake_warehouse: Optional[str] = None
+    snowflake_database: Optional[str] = "MDLH_GOLD_RKO"
+    snowflake_schema: Optional[str] = "PUBLIC"
+    snowflake_role: Optional[str] = None
 
     def is_configured(self) -> bool:
         """Check if required settings are configured."""
         return bool(self.anthropic_api_key and self.atlan_base_url)
+
+    def is_mdlh_configured(self) -> bool:
+        """Check if MDLH/Snowflake settings are configured."""
+        return bool(self.snowflake_account and self.snowflake_user)
 
     def mask_key(self, key: Optional[str]) -> Optional[str]:
         """Mask an API key for display."""
@@ -151,7 +163,14 @@ class AppSettings(BaseModel):
             "llm_proxy_url": self.llm_proxy_url,
             "claude_model": self.claude_model,
             "default_glossary_qn": self.default_glossary_qn,
+            "snowflake_account": self.snowflake_account,
+            "snowflake_user": self.snowflake_user,
+            "snowflake_warehouse": self.snowflake_warehouse,
+            "snowflake_database": self.snowflake_database,
+            "snowflake_schema": self.snowflake_schema,
+            "snowflake_role": self.snowflake_role,
             "is_configured": self.is_configured(),
+            "is_mdlh_configured": self.is_mdlh_configured(),
         }
 
 

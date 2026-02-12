@@ -66,6 +66,14 @@ class ContextBuilder:
         if asset.schema_name:
             context["schema"] = asset.schema_name
 
+        # Add lineage information (from MDLH)
+        if asset.upstream_assets:
+            context["upstream_assets"] = asset.upstream_assets[:10]
+            context["upstream_count"] = len(asset.upstream_assets)
+        if asset.downstream_assets:
+            context["downstream_assets"] = asset.downstream_assets[:10]
+            context["downstream_count"] = len(asset.downstream_assets)
+
         return context
 
     def build_batch_context(
@@ -99,7 +107,17 @@ class ContextBuilder:
         # Progressively remove less important fields
         truncated = context.copy()
 
-        # First, reduce columns
+        # First, remove lineage details (keep counts)
+        if "upstream_assets" in truncated:
+            del truncated["upstream_assets"]
+        if "downstream_assets" in truncated:
+            del truncated["downstream_assets"]
+
+        serialized = json.dumps(truncated)
+        if self.estimate_token_count(serialized) <= max_tokens:
+            return truncated
+
+        # Next, reduce columns
         if "columns" in truncated and len(truncated["columns"]) > 10:
             truncated["columns"] = truncated["columns"][:10]
 

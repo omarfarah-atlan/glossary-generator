@@ -40,6 +40,14 @@
                         </span>
                         <button class="btn btn-secondary btn-sm" onclick="testAtlan()">Test</button>
                     </div>
+                    <div class="status-item">
+                        <span class="status-label">MDLH (Snowflake)</span>
+                        <span class="status-indicator" id="mdlhStatus">
+                            <span class="status-dot unknown"></span>
+                            <span class="status-text">Not tested</span>
+                        </span>
+                        <button class="btn btn-secondary btn-sm" onclick="testMdlh()">Test</button>
+                    </div>
                 </div>
             </section>
 
@@ -106,6 +114,57 @@
                         <input type="text" id="defaultGlossary" name="default_glossary_qn"
                                placeholder="default/glossary/business-glossary">
                         <small>The qualified name of the default target glossary</small>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Snowflake MDLH Settings -->
+            <section class="card">
+                <h2>Snowflake MDLH Settings</h2>
+                <p style="margin-top: -8px; margin-bottom: 16px; font-size: 0.9rem; color: var(--text-muted);">
+                    Optional. Supplements Atlan API with lineage and usage data from Snowflake MDLH. Uses browser SSO for authentication.
+                </p>
+                <form id="mdlhForm" onsubmit="return false;">
+                    <div class="form-group">
+                        <label for="snowflakeAccount">Snowflake Account</label>
+                        <input type="text" id="snowflakeAccount" name="snowflake_account"
+                               placeholder="ZXXMVJQ-ATLAN_PARTNER">
+                        <small>Your Snowflake account identifier</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="snowflakeUser">User (Email)</label>
+                        <input type="text" id="snowflakeUser" name="snowflake_user"
+                               placeholder="YOUR.NAME@ATLAN.COM">
+                        <small>Your Snowflake username (SSO email)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="snowflakeWarehouse">Warehouse</label>
+                        <input type="text" id="snowflakeWarehouse" name="snowflake_warehouse"
+                               placeholder="SNOWFLAKE_LEARNING_WH">
+                        <small>Snowflake warehouse for queries</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="snowflakeDatabase">Database</label>
+                        <input type="text" id="snowflakeDatabase" name="snowflake_database"
+                               placeholder="MDLH_GOLD_RKO" value="MDLH_GOLD_RKO">
+                        <small>MDLH database name</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="snowflakeSchema">Schema</label>
+                        <input type="text" id="snowflakeSchema" name="snowflake_schema"
+                               placeholder="PUBLIC" value="PUBLIC">
+                        <small>MDLH schema name</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="snowflakeRole">Role (Optional)</label>
+                        <input type="text" id="snowflakeRole" name="snowflake_role"
+                               placeholder="MDLH_READ_ONLY_ROLE">
+                        <small>Snowflake role to use</small>
                     </div>
                 </form>
             </section>
@@ -256,9 +315,30 @@
                     document.getElementById('defaultGlossary').value = settings.default_glossary_qn;
                 }
 
+                // MDLH fields
+                if (settings.snowflake_account) {
+                    document.getElementById('snowflakeAccount').value = settings.snowflake_account;
+                }
+                if (settings.snowflake_user) {
+                    document.getElementById('snowflakeUser').value = settings.snowflake_user;
+                }
+                if (settings.snowflake_warehouse) {
+                    document.getElementById('snowflakeWarehouse').value = settings.snowflake_warehouse;
+                }
+                if (settings.snowflake_database) {
+                    document.getElementById('snowflakeDatabase').value = settings.snowflake_database;
+                }
+                if (settings.snowflake_schema) {
+                    document.getElementById('snowflakeSchema').value = settings.snowflake_schema;
+                }
+                if (settings.snowflake_role) {
+                    document.getElementById('snowflakeRole').value = settings.snowflake_role;
+                }
+
                 // Update status indicators based on configuration
                 updateConfigStatus('anthropicStatus', settings.anthropic_api_key ? 'configured' : 'missing');
                 updateConfigStatus('atlanStatus', settings.atlan_base_url ? 'configured' : 'missing');
+                updateConfigStatus('mdlhStatus', settings.is_mdlh_configured ? 'configured' : 'missing');
 
             } catch (error) {
                 console.error('Error loading settings:', error);
@@ -276,6 +356,12 @@
                 llm_proxy_url: document.getElementById('llmProxyUrl').value || null,
                 atlan_base_url: document.getElementById('atlanUrl').value || null,
                 default_glossary_qn: document.getElementById('defaultGlossary').value || null,
+                snowflake_account: document.getElementById('snowflakeAccount').value || null,
+                snowflake_user: document.getElementById('snowflakeUser').value || null,
+                snowflake_warehouse: document.getElementById('snowflakeWarehouse').value || null,
+                snowflake_database: document.getElementById('snowflakeDatabase').value || null,
+                snowflake_schema: document.getElementById('snowflakeSchema').value || null,
+                snowflake_role: document.getElementById('snowflakeRole').value || null,
             };
 
             // Only include API keys if they look like actual keys (not masked)
@@ -346,6 +432,23 @@
                 }
             } catch (error) {
                 updateStatus('atlanStatus', 'error', 'Test failed');
+            }
+        }
+
+        async function testMdlh() {
+            updateStatus('mdlhStatus', 'testing', 'Testing (check browser for SSO)...');
+
+            try {
+                const response = await fetch('/api/v1/settings/test-mdlh', { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    updateStatus('mdlhStatus', 'success', `Connected as ${result.user} (${result.warehouse})`);
+                } else {
+                    updateStatus('mdlhStatus', 'error', result.error || 'Connection failed');
+                }
+            } catch (error) {
+                updateStatus('mdlhStatus', 'error', 'Test failed');
             }
         }
 

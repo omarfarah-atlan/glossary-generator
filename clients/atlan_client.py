@@ -48,15 +48,11 @@ class AtlanMetadataClient:
     async def validate_glossary_exists(self, glossary_qn: str) -> bool:
         """Check if a glossary exists in Atlan."""
         try:
-            # Use AtlasGlossary attributes for searching
-            search = (
-                FluentSearch()
-                .where(AtlasGlossary.QUALIFIED_NAME.eq(glossary_qn))
-                .where(AtlasGlossary.TYPE_NAME.eq("AtlasGlossary"))
-                .page_size(1)
+            glossary = self.client.asset.get_by_qualified_name(
+                qualified_name=glossary_qn,
+                asset_type=AtlasGlossary,
             )
-            results = self.client.asset.search(search)
-            return results.count > 0
+            return glossary is not None
         except Exception as e:
             logger.error(f"Error validating glossary: {e}")
             return False
@@ -79,7 +75,7 @@ class AtlanMetadataClient:
                 .page_size(min(max_results, 100))
             )
 
-            results = self.client.asset.search(search)
+            results = self.client.asset.search(search.to_request())
 
             for asset in results:
                 if len(assets) >= max_results:
@@ -173,7 +169,7 @@ class AtlanMetadataClient:
                 .page_size(1000)
             )
 
-            results = self.client.asset.search(search)
+            results = self.client.asset.search(search.to_request())
             return [asset.name for asset in results]
 
         except Exception as e:

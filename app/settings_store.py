@@ -168,10 +168,16 @@ def load_settings(force_refresh: bool = False) -> AppSettings:
         llm_proxy_url=os.environ.get("LLM_PROXY_URL", "https://llmproxy.atlan.dev"),
         claude_model=os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-20250514"),
         default_glossary_qn=os.environ.get("DEFAULT_GLOSSARY_QN"),
+        snowflake_account=os.environ.get("SNOWFLAKE_ACCOUNT"),
+        snowflake_user=os.environ.get("SNOWFLAKE_USER"),
+        snowflake_warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE"),
+        snowflake_database=os.environ.get("SNOWFLAKE_DATABASE", "MDLH_GOLD_RKO"),
+        snowflake_schema=os.environ.get("SNOWFLAKE_SCHEMA", "PUBLIC"),
+        snowflake_role=os.environ.get("SNOWFLAKE_ROLE"),
     )
 
     # If we got any real values from env, persist them
-    if settings.anthropic_api_key or settings.atlan_base_url:
+    if settings.anthropic_api_key or settings.atlan_base_url or settings.snowflake_account:
         save_settings(settings)
 
     _settings_cache = settings

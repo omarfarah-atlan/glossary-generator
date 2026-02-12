@@ -77,6 +77,9 @@
                         <span class="status-label">Status:</span>
                         <span id="workflowStatus" class="status-value badge">-</span>
                     </div>
+                    <div class="status-info">
+                        <span id="workflowMessage" class="status-value" style="font-size: 0.9rem; color: var(--text-muted);">-</span>
+                    </div>
                     <div class="progress-container">
                         <div class="progress-bar">
                             <div class="progress-fill" id="progressBar" style="width: 0%"></div>
@@ -181,6 +184,9 @@
 
                 statusEl.textContent = data.status || 'unknown';
                 statusEl.className = 'status-value badge badge-' + (data.status || 'unknown');
+
+                const messageEl = document.getElementById('workflowMessage');
+                messageEl.textContent = data.message || '';
 
                 const progress = data.progress || 0;
                 progressBar.style.width = progress + '%';
