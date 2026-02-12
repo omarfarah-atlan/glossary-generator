@@ -6,11 +6,13 @@ from typing import List, Optional
 from pyatlan.client.atlan import AtlanClient
 from pyatlan.model.assets import (
     AtlasGlossary,
+    AtlasGlossaryCategory,
     AtlasGlossaryTerm,
     Asset,
     Connection,
     Table,
     View,
+    DbtModel,
 )
 from pyatlan.model.fluent_search import FluentSearch
 from pyatlan.model.enums import AtlanConnectorType
@@ -31,6 +33,7 @@ class AtlanMetadataClient:
         self.base_url = base_url or settings.atlan_base_url or os.environ.get("ATLAN_BASE_URL")
         self.api_key = api_key or settings.atlan_api_key or os.environ.get("ATLAN_API_KEY")
         self._client: Optional[AtlanClient] = None
+        self._category_cache: dict = {}  # (glossary_qn, category_name) -> category_qn
 
     @property
     def client(self) -> AtlanClient:
@@ -89,6 +92,10 @@ class AtlanMetadataClient:
                     assets.append(metadata)
 
             logger.info(f"Fetched {len(assets)} assets from Atlan")
+
+            # Enrich with dbt model metadata
+            assets = await self.fetch_dbt_models_for_assets(assets)
+
             return assets
 
         except Exception as e:
@@ -132,12 +139,109 @@ class AtlanMetadataClient:
             logger.warning(f"Error converting asset {getattr(asset, 'name', 'unknown')}: {e}")
             return None
 
+    async def fetch_dbt_models_for_assets(self, assets: List[AssetMetadata]) -> List[AssetMetadata]:
+        """Fetch dbt model metadata linked to SQL assets and enrich AssetMetadata objects."""
+        if not assets:
+            return assets
+
+        qualified_names = [a.qualified_name for a in assets]
+        qn_to_asset = {a.qualified_name: a for a in assets}
+
+        try:
+            search = (
+                FluentSearch()
+                .where(DbtModel.TYPE_NAME.eq("DbtModel"))
+                .where(DbtModel.SQL_ASSETS.within(qualified_names))
+                .include_on_results(DbtModel.DBT_RAW_SQL)
+                .include_on_results(DbtModel.DBT_COMPILED_SQL)
+                .include_on_results(DbtModel.DBT_MATERIALIZATION_TYPE)
+                .page_size(min(len(qualified_names), 100))
+            )
+
+            results = self.client.asset.search(search.to_request())
+            enriched_count = 0
+
+            for dbt_model in results:
+                # Get linked SQL asset qualified names
+                sql_assets = getattr(dbt_model, "sql_assets", None) or []
+                for sql_asset in sql_assets:
+                    sql_qn = getattr(sql_asset, "qualified_name", None)
+                    if sql_qn and sql_qn in qn_to_asset:
+                        asset = qn_to_asset[sql_qn]
+                        asset.dbt_model_name = dbt_model.name
+                        asset.dbt_raw_sql = getattr(dbt_model, "dbt_raw_sql", None)
+                        asset.dbt_compiled_sql = getattr(dbt_model, "dbt_compiled_sql", None)
+                        asset.dbt_materialization_type = getattr(dbt_model, "dbt_materialization_type", None)
+                        enriched_count += 1
+
+            logger.info(f"Enriched {enriched_count} assets with dbt model metadata")
+
+        except Exception as e:
+            logger.warning(f"Could not fetch dbt models (continuing without): {e}")
+
+        return assets
+
+    # Term type to category name mapping
+    TERM_TYPE_CATEGORY_MAP = {
+        "business_term": "Business Terms",
+        "metric": "Metrics",
+        "dimension": "Dimensions",
+    }
+
+    async def get_or_create_category(
+        self,
+        glossary_qn: str,
+        category_name: str,
+    ) -> Optional[str]:
+        """Get or create a glossary category, with caching within a run."""
+        cache_key = (glossary_qn, category_name)
+        if cache_key in self._category_cache:
+            return self._category_cache[cache_key]
+
+        try:
+            # Search for existing category by name within the glossary
+            search = (
+                FluentSearch()
+                .where(AtlasGlossaryCategory.TYPE_NAME.eq("AtlasGlossaryCategory"))
+                .where(AtlasGlossaryCategory.ANCHOR.eq(glossary_qn))
+                .page_size(100)
+            )
+
+            results = self.client.asset.search(search.to_request())
+            for cat in results:
+                if cat.name == category_name:
+                    cat_qn = cat.qualified_name
+                    self._category_cache[cache_key] = cat_qn
+                    logger.info(f"Found existing category: {category_name} ({cat_qn})")
+                    return cat_qn
+
+            # Not found — create it
+            category = AtlasGlossaryCategory.creator(
+                name=category_name,
+                anchor=AtlasGlossary.ref_by_qualified_name(glossary_qn),
+            )
+
+            response = self.client.asset.save(category)
+            if response and response.assets_created(AtlasGlossaryCategory):
+                created = response.assets_created(AtlasGlossaryCategory)[0]
+                cat_qn = created.qualified_name
+                self._category_cache[cache_key] = cat_qn
+                logger.info(f"Created category: {category_name} ({cat_qn})")
+                return cat_qn
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Error getting/creating category '{category_name}': {e}")
+            return None
+
     async def create_glossary_term(
         self,
         term_draft: GlossaryTermDraft,
-        glossary_qn: str
+        glossary_qn: str,
+        term_type: Optional[str] = None,
     ) -> Optional[str]:
-        """Create a glossary term in Atlan from a draft."""
+        """Create a glossary term in Atlan from a draft, optionally assigning to a category."""
         try:
             term = AtlasGlossaryTerm.creator(
                 name=term_draft.name,
@@ -152,6 +256,16 @@ class AtlanMetadataClient:
             if term_draft.short_description:
                 term.user_description = term_draft.short_description
 
+            # Assign to category based on term type
+            effective_type = term_type or getattr(term_draft, 'term_type', None)
+            if effective_type:
+                type_value = effective_type.value if hasattr(effective_type, 'value') else str(effective_type)
+                category_name = self.TERM_TYPE_CATEGORY_MAP.get(type_value)
+                if category_name:
+                    cat_qn = await self.get_or_create_category(glossary_qn, category_name)
+                    if cat_qn:
+                        term.categories = [AtlasGlossaryCategory.ref_by_qualified_name(cat_qn)]
+
             # Save the term
             response = self.client.asset.save(term)
 
@@ -165,6 +279,26 @@ class AtlanMetadataClient:
         except Exception as e:
             logger.error(f"Error creating glossary term {term_draft.name}: {e}")
             return None
+
+    async def create_glossary(self, name: str, description: Optional[str] = None) -> dict:
+        """Create a new glossary in Atlan."""
+        try:
+            glossary = AtlasGlossary.creator(name=name)
+            if description:
+                glossary.description = description
+            response = self.client.asset.save(glossary)
+            if response and response.assets_created(AtlasGlossary):
+                created = response.assets_created(AtlasGlossary)[0]
+                logger.info(f"Created glossary: {created.qualified_name}")
+                return {
+                    "name": created.name,
+                    "qualified_name": created.qualified_name,
+                    "description": description,
+                }
+            raise ValueError("Glossary creation returned no created assets")
+        except Exception as e:
+            logger.error(f"Error creating glossary '{name}': {e}")
+            raise
 
     async def get_glossary_terms(self, glossary_qn: str) -> List[str]:
         """Get existing term names in a glossary to avoid duplicates."""

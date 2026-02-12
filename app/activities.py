@@ -9,8 +9,10 @@ from dapr.clients import DaprClient
 
 from app.models import (
     AssetMetadata,
+    ColumnClassification,
     GlossaryTermDraft,
     TermStatus,
+    TermType,
     UsageSignals,
     WorkflowConfig,
     BatchResult,
@@ -171,6 +173,7 @@ class GlossaryActivities:
     ) -> List[dict]:
         """Prioritize assets based on usage signals and metadata quality."""
         try:
+            activity.heartbeat(f"Prioritizing {len(assets_dict)} assets by usage and metadata quality...")
             assets = [AssetMetadata(**a) for a in assets_dict]
             usage_signals = {qn: UsageSignals(**u) for qn, u in usage_dict.items()}
 
@@ -178,6 +181,7 @@ class GlossaryActivities:
                 assets, usage_signals, max_results
             )
 
+            activity.heartbeat(f"Selected top {len(prioritized)} assets")
             logger.info(f"Prioritized {len(prioritized)} assets")
             return [a.model_dump() for a in prioritized]
 
@@ -186,21 +190,41 @@ class GlossaryActivities:
             return assets_dict[:max_results]
 
     @activity.defn
+    async def fetch_existing_terms(self, glossary_qn: str) -> List[str]:
+        """Fetch existing term names from Atlan glossary for deduplication."""
+        try:
+            term_names = await self.atlan_client.get_glossary_terms(glossary_qn)
+            logger.info(f"Fetched {len(term_names)} existing terms from glossary for dedup")
+            return term_names
+        except Exception as e:
+            logger.error(f"Error fetching existing terms: {e}")
+            return []
+
+    @activity.defn
     async def generate_term_definitions(
         self,
         assets_dict: List[dict],
         usage_dict: Dict[str, dict],
         target_glossary_qn: str,
+        existing_term_names: Optional[List[str]] = None,
+        custom_context: Optional[str] = None,
     ) -> List[dict]:
         """Generate term definitions using LLM."""
         try:
             assets = [AssetMetadata(**a) for a in assets_dict]
             usage_signals = {qn: UsageSignals(**u) for qn, u in usage_dict.items()}
 
+            activity.heartbeat(f"Starting asset-level term generation for {len(assets)} assets...")
+
             drafts = await self.term_generator.generate_all_terms(
-                assets, usage_signals, target_glossary_qn
+                assets,
+                usage_signals,
+                target_glossary_qn,
+                existing_term_names=set(existing_term_names or []),
+                custom_context=custom_context,
             )
 
+            activity.heartbeat(f"Completed: generated {len(drafts)} asset-level terms")
             logger.info(f"Generated {len(drafts)} term definitions")
             return [d.model_dump() for d in drafts]
 
@@ -208,20 +232,53 @@ class GlossaryActivities:
             logger.error(f"Error generating definitions: {e}")
             return []
 
+    def _load_existing_draft_names(self, client) -> set:
+        """Load term names from all existing Dapr draft batches for cross-batch dedup."""
+        existing_names = set()
+        try:
+            master_state = client.get_state(store_name=DAPR_STORE_NAME, key="glossary_batch_index")
+            if not master_state.data:
+                return existing_names
+            master = json.loads(master_state.data)
+            for bid in master.get("batch_ids", []):
+                batch_state = client.get_state(store_name=DAPR_STORE_NAME, key=f"glossary_batch_{bid}")
+                if not batch_state.data:
+                    continue
+                batch_info = json.loads(batch_state.data)
+                for tid in batch_info.get("term_ids", []):
+                    term_state = client.get_state(store_name=DAPR_STORE_NAME, key=f"glossary_term_{tid}")
+                    if term_state.data:
+                        term_data = json.loads(term_state.data)
+                        existing_names.add(term_data.get("name", "").lower())
+        except Exception as e:
+            logger.warning(f"Could not load existing draft names for dedup: {e}")
+        return existing_names
+
     @activity.defn
     async def save_draft_terms(
         self,
         terms_dict: List[dict],
         batch_id: str,
     ) -> dict:
-        """Save draft terms to Dapr state store."""
+        """Save draft terms to Dapr state store with cross-batch deduplication."""
         result = BatchResult(batch_id=batch_id)
 
         try:
             with DaprClient() as client:
+                # Cross-batch dedup: load names from previous batches
+                existing_draft_names = self._load_existing_draft_names(client)
+                skipped = 0
+
                 term_ids = []
 
                 for term_data in terms_dict:
+                    # Skip if a draft with this name already exists
+                    term_name = term_data.get("name", "")
+                    if term_name.lower() in existing_draft_names:
+                        logger.info(f"Cross-batch dedup: skipping already-drafted term '{term_name}'")
+                        skipped += 1
+                        continue
+
                     try:
                         term = GlossaryTermDraft(**term_data)
                         key = f"glossary_term_{term.id}"
@@ -236,12 +293,16 @@ class GlossaryActivities:
                         )
 
                         term_ids.append(term.id)
+                        existing_draft_names.add(term.name.lower())
                         result.terms_generated += 1
 
                     except Exception as e:
                         logger.error(f"Error saving term: {e}")
                         result.terms_failed += 1
                         result.errors.append(str(e))
+
+                if skipped > 0:
+                    logger.info(f"Cross-batch dedup: skipped {skipped} duplicate draft terms")
 
                 # Save batch index
                 batch_index = {
@@ -282,6 +343,108 @@ class GlossaryActivities:
             result.errors.append(f"Dapr connection error: {e}")
 
         return result.model_dump()
+
+    @activity.defn
+    async def classify_and_generate_column_terms(
+        self,
+        assets_dict: List[dict],
+        usage_dict: Dict[str, dict],
+        target_glossary_qn: str,
+        existing_term_names: Optional[List[str]] = None,
+        custom_context: Optional[str] = None,
+        term_types: Optional[List[str]] = None,
+    ) -> List[dict]:
+        """Classify columns and generate column-level glossary terms."""
+        try:
+            assets = [AssetMetadata(**a) for a in assets_dict]
+            usage_signals = {qn: UsageSignals(**u) for qn, u in usage_dict.items()}
+
+            # Which column-level types are requested
+            allowed_types = set(term_types or ["metric", "dimension"])
+            type_labels = {"metric": "Metrics", "dimension": "Dimensions", "business_term": "Business Terms"}
+
+            existing_lower = {n.lower() for n in (existing_term_names or [])}
+            generated_names: set = set()
+            all_column_terms = []
+
+            assets_with_columns = [a for a in assets if a.columns]
+            total = len(assets_with_columns)
+
+            for idx, asset in enumerate(assets_with_columns, 1):
+                col_count = len(asset.columns)
+                activity.heartbeat(
+                    f"[{idx}/{total}] Classifying {col_count} columns in {asset.name}..."
+                )
+
+                # Classify columns (one LLM call per asset)
+                classifications = await self.term_generator.classify_asset_columns(asset)
+
+                if not classifications:
+                    logger.info(f"[{idx}/{total}] {asset.name}: no classifications returned")
+                    continue
+
+                # Filter to only requested term types
+                filtered = [
+                    c for c in classifications
+                    if c.should_generate and c.term_type.value in allowed_types
+                ]
+                skipped_type = sum(
+                    1 for c in classifications
+                    if c.should_generate and c.term_type.value not in allowed_types
+                )
+
+                selected = len(filtered)
+                logger.info(
+                    f"[{idx}/{total}] {asset.name}: {selected}/{col_count} columns selected "
+                    f"for term generation (skipped {skipped_type} outside requested types)"
+                )
+
+                if not filtered:
+                    continue
+
+                activity.heartbeat(
+                    f"[{idx}/{total}] Generating {selected} column terms for {asset.name}..."
+                )
+
+                # Generate terms for selected columns
+                usage = usage_signals.get(asset.qualified_name)
+                column_drafts = await self.term_generator.generate_column_terms_for_asset(
+                    asset=asset,
+                    classifications=filtered,
+                    usage=usage,
+                    target_glossary_qn=target_glossary_qn,
+                    custom_context=custom_context,
+                )
+
+                # Deduplicate against existing and already-generated names
+                added = 0
+                for draft in column_drafts:
+                    name_lower = draft.name.lower()
+                    if name_lower in existing_lower or name_lower in generated_names:
+                        logger.info(f"Column term dedup: skipping duplicate '{draft.name}'")
+                        continue
+                    generated_names.add(name_lower)
+                    all_column_terms.append(draft)
+                    added += 1
+
+                activity.heartbeat(
+                    f"[{idx}/{total}] {asset.name}: generated {added} column terms "
+                    f"({len(all_column_terms)} total so far)"
+                )
+
+            # Final summary by type
+            type_counts = {}
+            for t in all_column_terms:
+                tv = t.term_type.value
+                type_counts[tv] = type_counts.get(tv, 0) + 1
+            summary = ", ".join(f"{type_labels.get(k, k)}: {v}" for k, v in type_counts.items())
+            logger.info(f"Generated {len(all_column_terms)} column-level terms total — {summary}")
+
+            return [d.model_dump() for d in all_column_terms]
+
+        except Exception as e:
+            logger.error(f"Error in column term generation: {e}")
+            return []
 
     @activity.defn
     async def notify_stewards(self, batch_id: str, term_count: int) -> bool:
@@ -351,9 +514,9 @@ class GlossaryActivities:
                             results["errors"].append(f"Term not approved: {term_id}")
                             continue
 
-                        # Create in Atlan
+                        # Create in Atlan (with term type for category assignment)
                         qn = await self.atlan_client.create_glossary_term(
-                            term, term.target_glossary_qn
+                            term, term.target_glossary_qn, term_type=term.term_type.value
                         )
 
                         if qn:

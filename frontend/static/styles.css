@@ -825,6 +825,129 @@ header h1 {
     color: #c13239;
 }
 
+/* Term type badges */
+.badge-business_term {
+    background: var(--atlan-info-bg);
+    color: var(--atlan-primary);
+}
+
+.badge-metric {
+    background: var(--atlan-success-bg);
+    color: #006b54;
+}
+
+.badge-dimension {
+    background: #f3e8ff;
+    color: #7c3aed;
+}
+
+.badge-classifying_columns {
+    background: var(--atlan-info-bg);
+    color: var(--atlan-primary);
+}
+
+.badge-new {
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    animation: fadeIn 0.3s ease;
+}
+
+/* Form sections */
+.form-section {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--atlan-border-light);
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+}
+
+.form-section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.form-section-number {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--atlan-primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.form-section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--atlan-text-primary);
+    margin: 0;
+    line-height: 1.3;
+}
+
+.form-section-desc {
+    font-size: 0.8rem;
+    color: var(--atlan-text-muted);
+    margin: 2px 0 0;
+    line-height: 1.3;
+}
+
+/* Term type checkboxes */
+.term-type-checkboxes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.checkbox-label {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border: 1px solid var(--atlan-border-light);
+    border-radius: var(--atlan-radius-sm);
+    cursor: pointer;
+    transition: var(--atlan-transition);
+    background: var(--atlan-bg-card);
+    font-weight: 400 !important;
+    margin-bottom: 0 !important;
+}
+
+.checkbox-label:hover {
+    border-color: var(--atlan-primary-light);
+    background: var(--atlan-bg-light);
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    accent-color: var(--atlan-primary);
+}
+
+.checkbox-label .badge {
+    font-size: 0.75rem;
+    padding: 2px 10px;
+    flex-shrink: 0;
+}
+
+.checkbox-desc {
+    font-size: 0.8rem;
+    color: var(--atlan-text-muted);
+    flex: 1;
+}
+
 /* Stats dashboard */
 .stats-dashboard {
     display: grid;
@@ -1278,8 +1401,9 @@ footer strong {
     }
 }
 
-/* Smooth transitions */
-* {
+/* Smooth transitions — scoped to interactive elements, not timeline circles */
+.btn, .card, .stat-card, .stat-item, .term-card, .nav-tab, .form-group input,
+.form-group select, .form-group textarea, .tag, .badge, .upload-zone, .checkbox-label {
     transition-property: background-color, border-color, box-shadow, transform;
     transition-duration: 0.2s;
     transition-timing-function: ease-in-out;
@@ -1428,6 +1552,108 @@ footer strong {
     .stats-dashboard {
         grid-template-columns: 1fr;
     }
+}
+
+/* ================================================
+   Upload Zone
+   ================================================ */
+
+.upload-zone {
+    border: 2px dashed var(--atlan-border);
+    border-radius: var(--atlan-radius-sm);
+    padding: 28px 20px;
+    text-align: center;
+    color: var(--atlan-text-muted);
+    cursor: pointer;
+    transition: var(--atlan-transition);
+    background: var(--atlan-bg-page);
+}
+
+.upload-zone:hover {
+    border-color: var(--atlan-primary-light);
+    background: var(--atlan-bg-light);
+}
+
+.upload-zone.drag-active {
+    border-color: var(--atlan-primary);
+    background: var(--atlan-info-bg);
+    color: var(--atlan-primary);
+}
+
+.upload-zone svg {
+    margin-bottom: 8px;
+    opacity: 0.5;
+}
+
+.upload-zone p {
+    margin: 4px 0;
+    font-size: 0.9rem;
+}
+
+.upload-zone .upload-hint {
+    font-size: 0.8rem;
+    color: var(--atlan-text-muted);
+}
+
+.upload-browse-btn {
+    background: none;
+    border: none;
+    color: var(--atlan-primary);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: inherit;
+    padding: 0;
+}
+
+.upload-file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.upload-file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--atlan-bg-light);
+    border-radius: var(--atlan-radius-sm);
+    border: 1px solid var(--atlan-border-light);
+    font-size: 0.85rem;
+}
+
+.upload-file-name {
+    flex: 1;
+    font-weight: 500;
+    color: var(--atlan-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.upload-file-size {
+    color: var(--atlan-text-muted);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.upload-file-remove {
+    background: none;
+    border: none;
+    color: var(--atlan-text-muted);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0 4px;
+    line-height: 1;
+    border-radius: 4px;
+    transition: var(--atlan-transition);
+}
+
+.upload-file-remove:hover {
+    color: var(--atlan-error);
+    background: var(--atlan-error-bg);
 }
 
 /* Add Inter font */

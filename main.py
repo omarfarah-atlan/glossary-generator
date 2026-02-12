@@ -4,12 +4,13 @@ import asyncio
 import logging
 import os
 import sys
+import uuid
 from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from temporalio.client import Client
 from temporalio.worker import Worker
@@ -17,6 +18,7 @@ from temporalio.worker import Worker
 from app.workflow import GlossaryGenerationWorkflow, ApprovalWorkflow
 from app.activities import GlossaryActivities
 from handlers.review_handler import router as review_router
+from generators.file_parser import parse_uploaded_file
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +44,7 @@ class GlossaryGeneratorApp:
         )
         self.temporal_client: Client = None
         self.activities = GlossaryActivities()
+        self._uploaded_contexts: dict = {}  # upload_id -> {filename, content, preview}
         self._setup_routes()
 
     def _setup_routes(self):
@@ -60,6 +63,17 @@ class GlossaryGeneratorApp:
             """Start a glossary generation workflow."""
             if not self.temporal_client:
                 return {"error": "Temporal client not initialized"}
+
+            # Resolve uploaded context files into a single custom_context string
+            upload_ids = config.pop("context_upload_ids", None) or []
+            if upload_ids:
+                context_parts = []
+                for uid in upload_ids:
+                    ctx = self._uploaded_contexts.get(uid)
+                    if ctx:
+                        context_parts.append(f"### {ctx['filename']}\n{ctx['content']}")
+                if context_parts:
+                    config["custom_context"] = "\n\n".join(context_parts)
 
             try:
                 handle = await self.temporal_client.start_workflow(
@@ -107,6 +121,51 @@ class GlossaryGeneratorApp:
                 logger.error(f"Error fetching glossaries: {e}")
                 return {"error": str(e), "glossaries": []}
 
+        @self.app.post("/api/v1/glossaries")
+        async def create_glossary(body: dict):
+            """Create a new glossary in Atlan."""
+            name = body.get("name", "").strip()
+            if not name:
+                return {"error": "Glossary name is required"}
+            description = body.get("description", "").strip() or None
+            try:
+                result = await self.activities.atlan_client.create_glossary(name, description)
+                return {"glossary": result}
+            except Exception as e:
+                logger.error(f"Error creating glossary: {e}")
+                return {"error": str(e)}
+
+        @self.app.post("/api/v1/upload-context")
+        async def upload_context(file: UploadFile = File(...)):
+            """Upload a context file (CSV, PDF, MD, TXT, JSON) for enriching term generation."""
+            content_bytes = await file.read()
+            parsed = parse_uploaded_file(file.filename, content_bytes)
+            if parsed is None:
+                return {"error": f"Could not parse file '{file.filename}'. Supported types: CSV, PDF, MD, TXT, JSON."}
+
+            upload_id = str(uuid.uuid4())
+            self._uploaded_contexts[upload_id] = {
+                "filename": file.filename,
+                "content": parsed,
+                "preview": parsed[:500],
+            }
+            logger.info(f"Uploaded context file '{file.filename}' ({len(parsed)} chars) as {upload_id}")
+            return {
+                "upload_id": upload_id,
+                "filename": file.filename,
+                "preview": parsed[:500],
+                "char_count": len(parsed),
+            }
+
+        @self.app.delete("/api/v1/upload-context/{upload_id}")
+        async def delete_context(upload_id: str):
+            """Remove a previously uploaded context file."""
+            if upload_id in self._uploaded_contexts:
+                filename = self._uploaded_contexts.pop(upload_id)["filename"]
+                logger.info(f"Removed uploaded context: {filename}")
+                return {"status": "removed", "upload_id": upload_id}
+            return {"error": "Upload not found"}
+
         @self.app.get("/api/v1/connectors")
         async def get_connectors():
             """Get all connector types."""
@@ -153,11 +212,13 @@ class GlossaryGeneratorApp:
                 self.activities.fetch_usage_signals,
                 self.activities.prioritize_assets,
                 self.activities.generate_term_definitions,
+                self.activities.classify_and_generate_column_terms,
                 self.activities.save_draft_terms,
                 self.activities.notify_stewards,
                 self.activities.get_draft_term,
                 self.activities.update_draft_term,
                 self.activities.publish_terms,
+                self.activities.fetch_existing_terms,
             ],
         )
 
@@ -194,11 +255,13 @@ class GlossaryGeneratorApp:
                 self.activities.fetch_usage_signals,
                 self.activities.prioritize_assets,
                 self.activities.generate_term_definitions,
+                self.activities.classify_and_generate_column_terms,
                 self.activities.save_draft_terms,
                 self.activities.notify_stewards,
                 self.activities.get_draft_term,
                 self.activities.update_draft_term,
                 self.activities.publish_terms,
+                self.activities.fetch_existing_terms,
             ],
         )
 

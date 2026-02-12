@@ -101,6 +101,15 @@
                             <option value="low">Low</option>
                         </select>
                     </div>
+                    <div class="filter-group">
+                        <label>Term Type:</label>
+                        <select id="termTypeFilter">
+                            <option value="">All</option>
+                            <option value="business_term">Business Term</option>
+                            <option value="metric">Metric</option>
+                            <option value="dimension">Dimension</option>
+                        </select>
+                    </div>
                     <button class="btn btn-secondary" id="refreshBtn">
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                             <path d="M7 1a6 6 0 100 12A6 6 0 007 1zm3 6.5H7V4h1v2.5h2v1z"/>
@@ -141,6 +150,7 @@
                     <div class="term-meta">
                         <span class="badge" id="modalConfidence">-</span>
                         <span class="badge" id="modalStatus">-</span>
+                        <span class="badge" id="modalTermType">-</span>
                     </div>
 
                     <div class="form-group">
@@ -198,6 +208,6 @@
         </footer>
     </div>
 
-    <script src="/static/review.js?v=3"></script>
+    <script src="/static/review.js?v=5"></script>
 </body>
 </html>

@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from app.models import GlossaryTermDraft, TermStatus, AppSettings
+from app.models import GlossaryTermDraft, TermStatus, TermType, AppSettings
 from app.settings_store import load_settings, save_settings
 
 logger = logging.getLogger(__name__)
@@ -173,6 +173,7 @@ async def review_page(request: Request):
 async def list_terms(
     status: Optional[str] = None,
     confidence: Optional[str] = None,
+    term_type: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
 ):
@@ -187,6 +188,10 @@ async def list_terms(
     # Filter by confidence if specified
     if confidence:
         terms = [t for t in terms if t.confidence == confidence]
+
+    # Filter by term type if specified
+    if term_type:
+        terms = [t for t in terms if t.term_type.value == term_type]
 
     # Apply pagination
     total = len(terms)
@@ -389,9 +394,9 @@ async def publish_terms(request: PublishRequest):
                         results["errors"].append(f"Term not approved: {term_id}")
                         continue
 
-                    # Create in Atlan
+                    # Create in Atlan (with term type for category assignment)
                     qn = await atlan_client.create_glossary_term(
-                        term, term.target_glossary_qn
+                        term, term.target_glossary_qn, term_type=term.term_type.value
                     )
 
                     if qn:
@@ -429,6 +434,7 @@ async def get_stats():
         "total": len(terms),
         "by_status": {},
         "by_confidence": {},
+        "by_term_type": {},
     }
 
     for status in TermStatus:
@@ -437,6 +443,11 @@ async def get_stats():
     for confidence in ["high", "medium", "low"]:
         stats["by_confidence"][confidence] = sum(
             1 for t in terms if t.confidence == confidence
+        )
+
+    for tt in TermType:
+        stats["by_term_type"][tt.value] = sum(
+            1 for t in terms if t.term_type == tt
         )
 
     return stats

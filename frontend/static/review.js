@@ -8,6 +8,7 @@ let currentTerm = null;
 const termsList = document.getElementById('termsList');
 const statusFilter = document.getElementById('statusFilter');
 const confidenceFilter = document.getElementById('confidenceFilter');
+const termTypeFilter = document.getElementById('termTypeFilter');
 const refreshBtn = document.getElementById('refreshBtn');
 const bulkApproveBtn = document.getElementById('bulkApproveBtn');
 const publishBtn = document.getElementById('publishBtn');
@@ -22,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Event listeners
     statusFilter.addEventListener('change', loadTerms);
     confidenceFilter.addEventListener('change', loadTerms);
+    termTypeFilter.addEventListener('change', loadTerms);
     refreshBtn.addEventListener('click', () => {
         loadStats();
         loadTerms();
@@ -63,10 +65,12 @@ async function loadTerms() {
 
     const status = statusFilter.value;
     const confidence = confidenceFilter.value;
+    const termType = termTypeFilter.value;
 
     let url = '/api/v1/terms?limit=100';
     if (status) url += `&status=${status}`;
     if (confidence) url += `&confidence=${confidence}`;
+    if (termType) url += `&term_type=${termType}`;
 
     try {
         const response = await fetch(url);
@@ -99,14 +103,12 @@ function renderTerms() {
             <div class="term-content" onclick="openTermModal('${term.id}')">
                 <div class="term-header">
                     <span class="term-name">${escapeHtml(term.name)}</span>
+                    ${isNewTerm(term) ? '<span class="badge badge-new">New</span>' : ''}
+                    <span class="badge badge-${term.term_type || 'business_term'}">${formatTermType(term.term_type)}</span>
                     <span class="badge badge-${term.confidence}">${term.confidence}</span>
                     <span class="badge badge-${term.status}">${formatStatus(term.status)}</span>
                 </div>
                 <p class="term-definition">${escapeHtml(term.definition)}</p>
-                <div class="term-meta">
-                    <span class="tag">Queries: ${term.query_frequency || 0}</span>
-                    <span class="tag">Users: ${term.user_access_count || 0}</span>
-                </div>
             </div>
         </div>
     `).join('');
@@ -137,6 +139,8 @@ function openTermModal(termId) {
     document.getElementById('modalConfidence').className = `badge badge-${currentTerm.confidence}`;
     document.getElementById('modalStatus').textContent = formatStatus(currentTerm.status);
     document.getElementById('modalStatus').className = `badge badge-${currentTerm.status}`;
+    document.getElementById('modalTermType').textContent = formatTermType(currentTerm.term_type);
+    document.getElementById('modalTermType').className = `badge badge-${currentTerm.term_type || 'business_term'}`;
     document.getElementById('modalDefinition').value = currentTerm.edited_definition || currentTerm.definition;
     document.getElementById('modalShortDesc').value = currentTerm.short_description || '';
     document.getElementById('modalNotes').value = currentTerm.reviewer_notes || '';
@@ -296,6 +300,22 @@ async function publishApproved() {
 
 function formatStatus(status) {
     return status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatTermType(termType) {
+    const labels = {
+        'business_term': 'Business Term',
+        'metric': 'Metric',
+        'dimension': 'Dimension',
+    };
+    return labels[termType] || 'Business Term';
+}
+
+function isNewTerm(term) {
+    if (!term.created_at) return false;
+    const created = new Date(term.created_at);
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    return created > oneHourAgo;
 }
 
 function escapeHtml(text) {

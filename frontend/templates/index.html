@@ -104,60 +104,158 @@
                 </div>
 
                 <form id="workflowForm">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="glossarySelect">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="label-icon">
-                                    <path d="M2 2h10a1 1 0 011 1v8a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1z"/>
-                                </svg>
-                                Target Glossary
-                                <span class="required">*</span>
-                            </label>
-                            <div class="select-wrapper">
-                                <select id="glossarySelect" name="target_glossary" required>
-                                    <option value="">Loading glossaries...</option>
-                                </select>
-                                <svg class="select-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                                    <path d="M6 8L2 4h8L6 8z"/>
-                                </svg>
+                    <!-- Step 1: Target & Source -->
+                    <div class="form-section">
+                        <div class="form-section-header">
+                            <span class="form-section-number">1</span>
+                            <div>
+                                <h3 class="form-section-title">Target & Source</h3>
+                                <p class="form-section-desc">Where to save terms and which data to scan</p>
                             </div>
-                            <small>Glossary where AI-generated terms will be saved for review</small>
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="glossarySelect">
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="label-icon">
+                                        <path d="M2 2h10a1 1 0 011 1v8a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1z"/>
+                                    </svg>
+                                    Target Glossary
+                                    <span class="required">*</span>
+                                </label>
+                                <div class="select-wrapper">
+                                    <select id="glossarySelect" name="target_glossary" required>
+                                        <option value="">Loading glossaries...</option>
+                                    </select>
+                                    <svg class="select-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                                        <path d="M6 8L2 4h8L6 8z"/>
+                                    </svg>
+                                </div>
+                                <!-- Inline create glossary form -->
+                                <div id="createGlossaryInline" style="display:none; margin-top: 10px;">
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <input type="text" id="newGlossaryName" placeholder="New glossary name" style="flex:1; padding:10px 14px; border:2px solid var(--atlan-border); border-radius:var(--atlan-radius-sm); font-size:0.9rem;">
+                                        <button type="button" class="btn btn-primary btn-sm" onclick="createNewGlossary()">Create</button>
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="cancelCreateGlossary()">Cancel</button>
+                                    </div>
+                                </div>
+                                <small>Glossary where AI-generated terms will be saved for review</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="connectorSelect">
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="label-icon">
+                                        <path d="M7 1a6 6 0 100 12A6 6 0 007 1zm0 9l-3-3h6L7 10z"/>
+                                    </svg>
+                                    Connector Type
+                                </label>
+                                <div class="select-wrapper">
+                                    <select id="connectorSelect" name="connector_type">
+                                        <option value="">Loading connectors...</option>
+                                    </select>
+                                    <svg class="select-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                                        <path d="M6 8L2 4h8L6 8z"/>
+                                    </svg>
+                                </div>
+                                <small>Filter assets by data source type (optional)</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="connectionSelect">
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="label-icon">
+                                        <path d="M12 6H8V2a1 1 0 00-2 0v4H2a1 1 0 000 2h4v4a1 1 0 002 0V8h4a1 1 0 000-2z"/>
+                                    </svg>
+                                    Specific Connection
+                                </label>
+                                <div class="select-wrapper">
+                                    <select id="connectionSelect" name="connection_qn">
+                                        <option value="">Select a connector type first</option>
+                                    </select>
+                                    <svg class="select-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                                        <path d="M6 8L2 4h8L6 8z"/>
+                                    </svg>
+                                </div>
+                                <small>Narrow down to a specific connection (optional)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Generation Settings -->
+                    <div class="form-section">
+                        <div class="form-section-header">
+                            <span class="form-section-number">2</span>
+                            <div>
+                                <h3 class="form-section-title">Generation Settings</h3>
+                                <p class="form-section-desc">Choose term types and how many to create</p>
+                            </div>
                         </div>
 
                         <div class="form-group">
-                            <label for="connectorSelect">
+                            <label>
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="label-icon">
-                                    <path d="M7 1a6 6 0 100 12A6 6 0 007 1zm0 9l-3-3h6L7 10z"/>
+                                    <path d="M3 3h8a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1zm2 2v1h4V5H5zm0 3v1h3V8H5z"/>
                                 </svg>
-                                Connector Type
+                                Term Types to Generate
                             </label>
-                            <div class="select-wrapper">
-                                <select id="connectorSelect" name="connector_type">
-                                    <option value="">Loading connectors...</option>
-                                </select>
-                                <svg class="select-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                                    <path d="M6 8L2 4h8L6 8z"/>
-                                </svg>
+                            <div class="term-type-checkboxes">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="term_type" value="business_term" checked>
+                                    <span class="badge badge-business_term">Business Terms</span>
+                                    <span class="checkbox-desc">Business concepts from tables and views</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="term_type" value="metric" checked>
+                                    <span class="badge badge-metric">Metrics</span>
+                                    <span class="checkbox-desc">Numeric values and KPIs (revenue, count, conversion rate)</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="term_type" value="dimension" checked>
+                                    <span class="badge badge-dimension">Dimensions</span>
+                                    <span class="checkbox-desc">Categorical attributes (status, region, segment)</span>
+                                </label>
                             </div>
-                            <small>Filter assets by data source type (optional)</small>
+                            <small>Metrics and Dimensions are discovered from columns automatically.</small>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 16px;">
+                            <label for="maxTerms">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="label-icon">
+                                    <path d="M2 3h10v2H2V3zm0 4h7v2H2V7zm0 4h10v2H2v-2z"/>
+                                </svg>
+                                Number of Terms
+                            </label>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <input type="range" id="maxTermsRange" min="1" max="15" value="10"
+                                       style="flex: 1; accent-color: var(--atlan-primary);"
+                                       oninput="document.getElementById('maxTermsValue').textContent = this.value; document.getElementById('maxTerms').value = this.value;">
+                                <span id="maxTermsValue" style="font-weight: 600; font-size: 1.1rem; min-width: 24px; text-align: center;">10</span>
+                                <input type="hidden" id="maxTerms" value="10">
+                            </div>
+                            <small>Maximum number of glossary terms to create in this run (1-15)</small>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Additional Context -->
+                    <div class="form-section">
+                        <div class="form-section-header">
+                            <span class="form-section-number">3</span>
+                            <div>
+                                <h3 class="form-section-title">Additional Context</h3>
+                                <p class="form-section-desc">Optional files to improve term quality</p>
+                            </div>
                         </div>
 
                         <div class="form-group">
-                            <label for="connectionSelect">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="label-icon">
-                                    <path d="M12 6H8V2a1 1 0 00-2 0v4H2a1 1 0 000 2h4v4a1 1 0 002 0V8h4a1 1 0 000-2z"/>
+                            <div class="upload-zone" id="uploadZone">
+                                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M16 6v14M10 12l6-6 6 6"/>
+                                    <path d="M6 22v2a2 2 0 002 2h16a2 2 0 002-2v-2"/>
                                 </svg>
-                                Specific Connection
-                            </label>
-                            <div class="select-wrapper">
-                                <select id="connectionSelect" name="connection_qn">
-                                    <option value="">Select a connector type first</option>
-                                </select>
-                                <svg class="select-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                                    <path d="M6 8L2 4h8L6 8z"/>
-                                </svg>
+                                <p>Drag & drop files here or <button type="button" class="upload-browse-btn" onclick="document.getElementById('fileInput').click()">browse</button></p>
+                                <p class="upload-hint">CSV, PDF, MD, TXT, JSON — max 10MB per file</p>
+                                <input type="file" id="fileInput" style="display:none;" accept=".csv,.pdf,.md,.txt,.json" multiple>
                             </div>
-                            <small>Narrow down to a specific connection (optional)</small>
+                            <div class="upload-file-list" id="uploadFileList"></div>
+                            <small>Upload data dictionaries, docs, or schemas to improve term quality</small>
                         </div>
                     </div>
 
@@ -233,13 +331,18 @@
                                 <div class="timeline-circle">5</div>
                                 <div class="timeline-label">Generate Terms</div>
                             </div>
-                            <div class="timeline-step" data-step="saving_drafts">
+                            <div class="timeline-step" data-step="classifying_columns">
                                 <div class="timeline-connector"></div>
                                 <div class="timeline-circle">6</div>
+                                <div class="timeline-label">Column Terms</div>
+                            </div>
+                            <div class="timeline-step" data-step="saving_drafts">
+                                <div class="timeline-connector"></div>
+                                <div class="timeline-circle">7</div>
                                 <div class="timeline-label">Save Drafts</div>
                             </div>
                             <div class="timeline-step" data-step="notifying">
-                                <div class="timeline-circle">7</div>
+                                <div class="timeline-circle">8</div>
                                 <div class="timeline-label">Notify</div>
                             </div>
                         </div>
@@ -348,6 +451,17 @@
             // Load glossaries
             await loadGlossaries();
 
+            // Show/hide create glossary form on select change
+            document.getElementById('glossarySelect').addEventListener('change', (e) => {
+                const createSection = document.getElementById('createGlossaryInline');
+                if (e.target.value === '__create_new__') {
+                    createSection.style.display = 'block';
+                    document.getElementById('newGlossaryName').focus();
+                } else {
+                    createSection.style.display = 'none';
+                }
+            });
+
             // Load connectors
             await loadConnectors();
 
@@ -386,8 +500,13 @@
                                (foundGlossaryBuddy ? ' (Glossary Buddy set as default)' : ''));
                 } else {
                     glossarySelect.innerHTML = '<option value="">No glossaries found</option>';
-                    showToast('No glossaries found in your Atlan instance', 'warning');
                 }
+
+                // Always add "Create New" option at the end
+                const createOpt = document.createElement('option');
+                createOpt.value = '__create_new__';
+                createOpt.textContent = '+ Create New Glossary';
+                glossarySelect.appendChild(createOpt);
             } catch (error) {
                 console.error('Error loading glossaries:', error);
                 glossarySelect.innerHTML = '<option value="">Error loading glossaries</option>';
@@ -457,25 +576,144 @@
             }
         }
 
+        async function createNewGlossary() {
+            const nameInput = document.getElementById('newGlossaryName');
+            const name = nameInput.value.trim();
+            if (!name) {
+                showToast('Please enter a glossary name', 'warning');
+                nameInput.focus();
+                return;
+            }
+            try {
+                const response = await fetch('/api/v1/glossaries', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name }),
+                });
+                const data = await response.json();
+                if (data.error) {
+                    showToast(`Failed to create glossary: ${data.error}`, 'error');
+                    return;
+                }
+                showToast(`Glossary "${data.glossary.name}" created!`, 'success');
+                const newQn = data.glossary.qualified_name;
+                // Reload dropdown and auto-select
+                await loadGlossaries();
+                document.getElementById('glossarySelect').value = newQn;
+                document.getElementById('createGlossaryInline').style.display = 'none';
+                nameInput.value = '';
+            } catch (error) {
+                showToast(`Error creating glossary: ${error.message}`, 'error');
+            }
+        }
+
+        function cancelCreateGlossary() {
+            document.getElementById('glossarySelect').value = '';
+            document.getElementById('createGlossaryInline').style.display = 'none';
+            document.getElementById('newGlossaryName').value = '';
+        }
+
+        // ---- File Upload ----
+        let uploadedFileIds = [];
+
+        (function initUploadZone() {
+            const zone = document.getElementById('uploadZone');
+            const fileInput = document.getElementById('fileInput');
+
+            zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-active'); });
+            zone.addEventListener('dragleave', () => { zone.classList.remove('drag-active'); });
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('drag-active');
+                handleFiles(e.dataTransfer.files);
+            });
+            fileInput.addEventListener('change', (e) => {
+                handleFiles(e.target.files);
+                fileInput.value = '';
+            });
+        })();
+
+        async function handleFiles(files) {
+            for (const file of files) {
+                if (file.size > 10 * 1024 * 1024) {
+                    showToast(`File "${file.name}" exceeds 10MB limit`, 'warning');
+                    continue;
+                }
+                const formData = new FormData();
+                formData.append('file', file);
+                try {
+                    const response = await fetch('/api/v1/upload-context', { method: 'POST', body: formData });
+                    const data = await response.json();
+                    if (data.error) {
+                        showToast(data.error, 'error');
+                        continue;
+                    }
+                    uploadedFileIds.push(data.upload_id);
+                    renderUploadedFiles(data);
+                    showToast(`Uploaded "${data.filename}" (${data.char_count} chars)`, 'success');
+                } catch (error) {
+                    showToast(`Upload failed: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        function renderUploadedFiles(newFile) {
+            const list = document.getElementById('uploadFileList');
+            const item = document.createElement('div');
+            item.className = 'upload-file-item';
+            item.dataset.uploadId = newFile.upload_id;
+            const sizeStr = newFile.char_count > 1000 ? `${(newFile.char_count / 1000).toFixed(1)}k chars` : `${newFile.char_count} chars`;
+            item.innerHTML = `
+                <span class="upload-file-name">${escapeHtml(newFile.filename)}</span>
+                <span class="upload-file-size">${sizeStr}</span>
+                <button type="button" class="upload-file-remove" onclick="removeUploadedFile('${newFile.upload_id}', this)">&times;</button>
+            `;
+            list.appendChild(item);
+        }
+
+        async function removeUploadedFile(uploadId, btn) {
+            try {
+                await fetch(`/api/v1/upload-context/${uploadId}`, { method: 'DELETE' });
+            } catch (e) { /* ignore */ }
+            uploadedFileIds = uploadedFileIds.filter(id => id !== uploadId);
+            btn.closest('.upload-file-item').remove();
+        }
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             setLoading(true);
 
             const glossaryQn = document.getElementById('glossarySelect').value;
-            if (!glossaryQn) {
+            if (!glossaryQn || glossaryQn === '__create_new__') {
                 showToast('Please select a target glossary', 'warning');
                 setLoading(false);
                 return;
             }
+
+            // Collect selected term types
+            const selectedTermTypes = Array.from(
+                document.querySelectorAll('input[name="term_type"]:checked')
+            ).map(cb => cb.value);
+
+            if (selectedTermTypes.length === 0) {
+                showToast('Please select at least one term type to generate', 'warning');
+                setLoading(false);
+                return;
+            }
+
+            const maxTerms = parseInt(document.getElementById('maxTerms').value) || 10;
 
             const config = {
                 target_glossary_qn: glossaryQn,
                 connector_type: document.getElementById('connectorSelect').value || null,
                 connection_qualified_name: document.getElementById('connectionSelect').value || null,
                 asset_types: ["Table", "View", "MaterializedView"],
-                max_assets: 10,
+                max_assets: Math.min(maxTerms * 2, 30),
                 min_popularity_score: 0,
                 batch_size: 10,
+                max_terms: maxTerms,
+                term_types: selectedTermTypes,
+                context_upload_ids: uploadedFileIds.length > 0 ? uploadedFileIds : null,
             };
 
             try {
@@ -497,6 +735,7 @@
                 // Reset log state for new workflow
                 lastLogCount = 0;
                 document.getElementById('activityLog').innerHTML = '<div class="log-empty">Waiting for workflow to start...</div>';
+                _lastTimelineStatus = null;
                 document.querySelectorAll('.timeline-step').forEach(s => s.classList.remove('completed', 'active', 'failed'));
                 document.getElementById('logDot').classList.remove('inactive');
                 statusSection.style.display = 'block';
@@ -516,10 +755,15 @@
         }
 
         // Timeline step order for comparison
-        const STEP_ORDER = ['validating', 'fetching_metadata', 'fetching_usage', 'prioritizing', 'generating_definitions', 'saving_drafts', 'notifying', 'completed'];
+        const STEP_ORDER = ['validating', 'fetching_metadata', 'fetching_usage', 'prioritizing', 'generating_definitions', 'classifying_columns', 'saving_drafts', 'notifying', 'completed'];
         let lastLogCount = 0;
 
+        let _lastTimelineStatus = null;
         function updateTimeline(currentStatus) {
+            // Skip update if status hasn't changed — avoids CSS transition flash
+            if (currentStatus === _lastTimelineStatus) return;
+            _lastTimelineStatus = currentStatus;
+
             const steps = document.querySelectorAll('.timeline-step');
             const currentIdx = STEP_ORDER.indexOf(currentStatus);
             const isFailed = currentStatus === 'failed';
@@ -528,22 +772,23 @@
                 const stepName = step.dataset.step;
                 const stepIdx = STEP_ORDER.indexOf(stepName);
 
-                step.classList.remove('completed', 'active', 'failed');
-
+                // Compute desired class
+                let desired = '';
                 if (isFailed) {
-                    if (stepIdx < currentIdx) {
-                        step.classList.add('completed');
-                    } else if (stepIdx === currentIdx) {
-                        step.classList.add('failed');
-                    }
+                    if (stepIdx < currentIdx) desired = 'completed';
+                    else if (stepIdx === currentIdx) desired = 'failed';
                 } else if (currentStatus === 'completed') {
-                    step.classList.add('completed');
-                } else {
-                    if (stepIdx < currentIdx) {
-                        step.classList.add('completed');
-                    } else if (stepIdx === currentIdx) {
-                        step.classList.add('active');
-                    }
+                    desired = 'completed';
+                } else if (currentIdx >= 0) {
+                    if (stepIdx < currentIdx) desired = 'completed';
+                    else if (stepIdx === currentIdx) desired = 'active';
+                }
+
+                // Only touch DOM if the class actually needs to change
+                const has = step.classList.contains(desired);
+                if (!has || (!desired && (step.classList.contains('completed') || step.classList.contains('active') || step.classList.contains('failed')))) {
+                    step.classList.remove('completed', 'active', 'failed');
+                    if (desired) step.classList.add(desired);
                 }
             });
         }

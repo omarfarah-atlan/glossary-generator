@@ -12,6 +12,13 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class TermType(str, Enum):
+    """Type classification for a glossary term."""
+    BUSINESS_TERM = "business_term"
+    METRIC = "metric"
+    DIMENSION = "dimension"
+
+
 class TermStatus(str, Enum):
     """Status of a glossary term draft."""
     DRAFT = "draft"
@@ -33,6 +40,8 @@ class GlossaryTermDraft(BaseModel):
     source_assets: List[str] = Field(default_factory=list)
     confidence: Literal["high", "medium", "low"] = "medium"
     status: TermStatus = TermStatus.DRAFT
+    term_type: TermType = TermType.BUSINESS_TERM
+    source_column: Optional[str] = None
     target_glossary_qn: str
     query_frequency: int = 0
     user_access_count: int = 0
@@ -67,6 +76,10 @@ class AssetMetadata(BaseModel):
     upstream_assets: List[str] = Field(default_factory=list)
     downstream_assets: List[str] = Field(default_factory=list)
     sql_definition: Optional[str] = None
+    dbt_raw_sql: Optional[str] = None
+    dbt_compiled_sql: Optional[str] = None
+    dbt_materialization_type: Optional[str] = None
+    dbt_model_name: Optional[str] = None
 
 
 class ColumnMetadata(BaseModel):
@@ -78,6 +91,14 @@ class ColumnMetadata(BaseModel):
     is_primary_key: bool = False
     is_foreign_key: bool = False
     is_nullable: bool = True
+
+
+class ColumnClassification(BaseModel):
+    """Classification result for a column from LLM analysis."""
+    column_name: str
+    term_type: TermType
+    should_generate: bool = False
+    reason: Optional[str] = None
 
 
 class UsageSignals(BaseModel):
@@ -95,10 +116,13 @@ class WorkflowConfig(BaseModel):
 
     target_glossary_qn: str
     asset_types: List[str] = Field(default=["Table", "View", "MaterializedView"])
-    max_assets: int = 100
+    max_assets: int = 50
     min_popularity_score: float = 0.0
     batch_size: int = 10
-    include_columns: bool = True
+    max_terms: int = Field(default=10, ge=1, le=15)
+    term_types: List[str] = Field(default=["business_term", "metric", "dimension"])
+    existing_term_names: List[str] = Field(default_factory=list)
+    custom_context: Optional[str] = None
 
 
 class BatchResult(BaseModel):

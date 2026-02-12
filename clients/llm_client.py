@@ -73,6 +73,81 @@ class ClaudeClient:
             logger.error(f"Error generating JSON with Claude: {e}")
             raise
 
+    async def generate_json_array(self, prompt: str, max_tokens: int = 4000) -> list:
+        """Generate a JSON array from a prompt using Claude via LiteLLM."""
+        try:
+            response = await self._client.chat.completions.create(
+                model=self.model,
+                max_tokens=max_tokens,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            text = response.choices[0].message.content
+
+            # Extract JSON array from the response
+            json_start = text.find("[")
+            json_end = text.rfind("]") + 1
+            if json_start != -1 and json_end > json_start:
+                json_str = text[json_start:json_end]
+                return json.loads(json_str)
+            else:
+                raise ValueError("No valid JSON array found in response")
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing JSON array from Claude response: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Error generating JSON array with Claude: {e}")
+            raise
+
+    async def classify_columns(
+        self,
+        asset_name: str,
+        asset_type: str,
+        description: Optional[str] = None,
+        columns: Optional[list] = None,
+    ) -> list:
+        """Classify columns for an asset to determine which deserve glossary terms."""
+        from generators.prompts import PromptTemplates
+
+        prompt = PromptTemplates.column_classification_prompt(
+            asset_name=asset_name,
+            asset_type=asset_type,
+            description=description,
+            columns=columns,
+        )
+
+        return await self.generate_json_array(prompt)
+
+    async def generate_column_term_definition(
+        self,
+        column_name: str,
+        column_data_type: Optional[str] = None,
+        column_description: Optional[str] = None,
+        term_type: str = "business_term",
+        parent_asset_name: Optional[str] = None,
+        parent_asset_type: Optional[str] = None,
+        parent_description: Optional[str] = None,
+        sibling_columns: Optional[list] = None,
+        sql_definition: Optional[str] = None,
+        custom_context: Optional[str] = None,
+    ) -> dict:
+        """Generate a glossary term definition for a specific column."""
+        from generators.prompts import PromptTemplates
+
+        prompt = PromptTemplates.column_term_definition_prompt(
+            column_name=column_name,
+            column_data_type=column_data_type,
+            column_description=column_description,
+            term_type=term_type,
+            parent_asset_name=parent_asset_name,
+            parent_asset_type=parent_asset_type,
+            parent_description=parent_description,
+            sibling_columns=sibling_columns,
+            sql_definition=sql_definition,
+            custom_context=custom_context,
+        )
+
+        return await self.generate_json(prompt)
+
     async def generate_term_definition(
         self,
         asset_name: str,
@@ -81,6 +156,8 @@ class ClaudeClient:
         columns: Optional[list] = None,
         usage_stats: Optional[dict] = None,
         sql_definition: Optional[str] = None,
+        dbt_context: Optional[dict] = None,
+        custom_context: Optional[str] = None,
     ) -> dict:
         """Generate a glossary term definition for an asset."""
         from generators.prompts import PromptTemplates
@@ -92,6 +169,8 @@ class ClaudeClient:
             columns=columns,
             usage_stats=usage_stats,
             sql_definition=sql_definition,
+            dbt_context=dbt_context,
+            custom_context=custom_context,
         )
 
         return await self.generate_json(prompt)

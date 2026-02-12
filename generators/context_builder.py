@@ -2,7 +2,7 @@
 
 from typing import Dict, List, Optional
 
-from app.models import AssetMetadata, UsageSignals
+from app.models import AssetMetadata, ColumnMetadata, TermType, UsageSignals
 
 
 class ContextBuilder:
@@ -70,6 +70,15 @@ class ContextBuilder:
         if asset.sql_definition:
             context["sql_definition"] = asset.sql_definition[:1500]
 
+        # Add dbt transformation context
+        if asset.dbt_model_name:
+            dbt_context = {"model_name": asset.dbt_model_name}
+            if asset.dbt_materialization_type:
+                dbt_context["materialization_type"] = asset.dbt_materialization_type
+            if asset.dbt_raw_sql:
+                dbt_context["raw_sql"] = asset.dbt_raw_sql[:2000]
+            context["dbt_context"] = dbt_context
+
         # Add lineage information (from MDLH)
         if asset.upstream_assets:
             context["upstream_assets"] = asset.upstream_assets[:10]
@@ -77,6 +86,44 @@ class ContextBuilder:
         if asset.downstream_assets:
             context["downstream_assets"] = asset.downstream_assets[:10]
             context["downstream_count"] = len(asset.downstream_assets)
+
+        return context
+
+    def build_column_context(
+        self,
+        asset: AssetMetadata,
+        column: ColumnMetadata,
+        term_type: TermType,
+        usage: Optional[UsageSignals] = None,
+    ) -> dict:
+        """Build context dictionary for a single column within an asset."""
+
+        context = {
+            "column_name": column.name,
+            "column_data_type": column.data_type,
+            "column_description": column.description,
+            "parent_asset_name": asset.name,
+            "parent_asset_type": asset.type_name,
+            "parent_description": asset.description or asset.user_description,
+            "term_type": term_type.value,
+        }
+
+        # Add sibling columns (up to 15, excluding the target column)
+        if asset.columns:
+            siblings = [
+                {
+                    "name": col.name,
+                    "data_type": col.data_type,
+                    "description": col.description,
+                }
+                for col in asset.columns[:16]
+                if col.name != column.name
+            ]
+            context["sibling_columns"] = siblings[:15]
+
+        # Add SQL definition (truncated)
+        if asset.sql_definition:
+            context["sql_definition"] = asset.sql_definition[:1500]
 
         return context
 
@@ -111,9 +158,28 @@ class ContextBuilder:
         # Progressively remove less important fields
         truncated = context.copy()
 
-        # First, remove SQL definition (large but less structured than columns)
+        # First, remove dbt SQL (can be large)
+        if "dbt_context" in truncated:
+            dbt = truncated["dbt_context"]
+            if "raw_sql" in dbt:
+                del dbt["raw_sql"]
+            if not dbt or dbt == {"model_name": truncated.get("dbt_context", {}).get("model_name")}:
+                pass  # keep minimal dbt context
+            serialized = json.dumps(truncated)
+            if self.estimate_token_count(serialized) <= max_tokens:
+                return truncated
+
+        # Next, remove SQL definition (large but less structured than columns)
         if "sql_definition" in truncated:
             del truncated["sql_definition"]
+
+        serialized = json.dumps(truncated)
+        if self.estimate_token_count(serialized) <= max_tokens:
+            return truncated
+
+        # Remove remaining dbt context
+        if "dbt_context" in truncated:
+            del truncated["dbt_context"]
 
         serialized = json.dumps(truncated)
         if self.estimate_token_count(serialized) <= max_tokens:
